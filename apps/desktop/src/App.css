@@ -1,0 +1,236 @@
+@import "tailwindcss";
+
+:root,
+.theme-dark {
+  --sb-bg-app: #171717;
+  --sb-bg-canvas: #212121;
+  --sb-bg-sidebar: #171717;
+  --sb-bg-composer: #2f2f2f;
+  --sb-bg-composer-border: #3c3c3c;
+  --sb-bg-composer-focus: #555555;
+  --sb-bg-card: #2a2a2a;
+  --sb-bg-card-hover: #333333;
+  --sb-bg-user-bubble: #2f2f2f;
+  --sb-border: #2d2d2d;
+  --sb-border-subtle: #242424;
+  --sb-text-primary: #ececec;
+  --sb-text-secondary: #8e8e8e;
+  --sb-text-muted: #666666;
+  --sb-code-bg: #161616;
+  --sb-code-header: #202020;
+  --sb-code-border: #2e2e2e;
+  --sb-hover-bg: #282828;
+  --sb-pill-bg: #2a2a2a;
+  --sb-progress-track: #2e2e2e;
+}
+
+.theme-light {
+  --sb-bg-app: #f9f9f8;
+  --sb-bg-canvas: #ffffff;
+  --sb-bg-sidebar: #f9f9f8;
+  --sb-bg-composer: #ffffff;
+  --sb-bg-composer-border: #dcdcd6;
+  --sb-bg-composer-focus: #b5b5ad;
+  --sb-bg-card: #ffffff;
+  --sb-bg-card-hover: #f3f3f0;
+  --sb-bg-user-bubble: #f2f1ee;
+  --sb-border: #e6e6e0;
+  --sb-border-subtle: #eeeeea;
+  --sb-text-primary: #1c1c1a;
+  --sb-text-secondary: #686762;
+  --sb-text-muted: #9c9b94;
+  --sb-code-bg: #f5f5f1;
+  --sb-code-header: #ebebe5;
+  --sb-code-border: #e0e0d8;
+  --sb-hover-bg: #eaeae4;
+  --sb-pill-bg: #f2f2ec;
+  --sb-progress-track: #ebebe5;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+    user-select: text;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Custom Minimalist Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.theme-dark ::-webkit-scrollbar-thumb {
+  background: #333333;
+  border-radius: 9999px;
+}
+
+.theme-dark ::-webkit-scrollbar-thumb:hover {
+  background: #4a4a4a;
+}
+
+.theme-light ::-webkit-scrollbar-thumb {
+  background: #d4d4cd;
+  border-radius: 9999px;
+}
+
+.theme-light ::-webkit-scrollbar-thumb:hover {
+  background: #b5b5ad;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+@keyframes birdFloat {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-4px) rotate(-1deg); }
+}
+
+.animate-songbird {
+  animation: birdFloat 3s infinite ease-in-out;
+}
+
+@keyframes cursorBlink {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 6px rgba(244, 63, 94, 0.7);
+  }
+  50% {
+    opacity: 0.15;
+    box-shadow: none;
+  }
+}
+
+.chat-streaming-cursor::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 15px;
+  margin-left: 4px;
+  vertical-align: -2px;
+  background-color: #f43f5e;
+  border-radius: 2px;
+  animation: cursorBlink 0.7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Progress Bar Animations */
+@keyframes progressIndeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-progress-indeterminate {
+  animation: progressIndeterminate 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  width: 100%;
+}
+
+@keyframes progressPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-progress-pulse {
+  animation: progressPulse 1.2s ease-in-out infinite;
+}
+
+/* Realtime Voice Agent Visualizer & Glow Styles */
+@keyframes voiceGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(244, 63, 94, 0.4), 0 0 30px rgba(244, 63, 94, 0.2);
+    border-color: rgba(244, 63, 94, 0.8);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(244, 63, 94, 0.8), 0 0 45px rgba(244, 63, 94, 0.4);
+    border-color: rgba(251, 113, 133, 1);
+  }
+}
+
+.animate-voice-glow {
+  animation: voiceGlow 2s infinite ease-in-out;
+}
+
+@keyframes voiceBarAnim1 {
+  0%, 100% { height: 4px; }
+  50% { height: 16px; }
+}
+@keyframes voiceBarAnim2 {
+  0%, 100% { height: 12px; }
+  50% { height: 6px; }
+}
+@keyframes voiceBarAnim3 {
+  0%, 100% { height: 6px; }
+  50% { height: 18px; }
+}
+@keyframes voiceBarAnim4 {
+  0%, 100% { height: 14px; }
+  50% { height: 4px; }
+}
+
+.voice-wave-bar-1 { animation: voiceBarAnim1 0.7s infinite ease-in-out; }
+.voice-wave-bar-2 { animation: voiceBarAnim2 0.5s infinite ease-in-out; }
+.voice-wave-bar-3 { animation: voiceBarAnim3 0.8s infinite ease-in-out; }
+.voice-wave-bar-4 { animation: voiceBarAnim4 0.6s infinite ease-in-out; }
+
+@keyframes voiceRipple {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+.animate-voice-hearing {
+  animation: voiceRipple 1.2s infinite ease-in-out;
+}
+
+@keyframes voiceRoseRipple {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.7);
+  }
+  70% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 8px rgba(244, 63, 94, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0);
+  }
+}
+
+.animate-voice-rose-ripple {
+  animation: voiceRoseRipple 1.1s infinite ease-in-out;
+}

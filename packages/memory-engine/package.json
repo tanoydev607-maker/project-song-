@@ -1,0 +1,7 @@
+{
+  "name": "@orca/memory-engine",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "types": "index.ts"
+}

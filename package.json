@@ -1,0 +1,15 @@
+{
+  "name": "orca-ai-desktop-root",
+  "private": true,
+  "scripts": {
+    "dev:engine": "cd engine/hermes-agent && .\\venv\\Scripts\\python.exe -u server.py",
+    "dev:desktop": "cmd /c \"set PATH=%USERPROFILE%\\.cargo\\bin;%PATH% && pnpm --filter orca-app dev\"",
+    "dev:window": "cmd /c start msedge --app=http://localhost:1420",
+    "dev:frontend": "pnpm --filter orca-app dev:frontend",
+    "chat": "cd engine/hermes-agent && .\\venv\\Scripts\\python.exe terminal_chat.py",
+    "build": "pnpm --recursive run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

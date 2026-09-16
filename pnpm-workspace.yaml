@@ -1,0 +1,7 @@
+packages:
+  - 'apps/*'
+  - 'engine/*'
+  - 'packages/*'
+allowBuilds:
+  agent-browser: true
+  esbuild: true

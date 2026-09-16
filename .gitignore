@@ -1,0 +1,35 @@
+# Node & Dependencies
+node_modules/
+.pnpm-store/
+dist/
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js
+
+# Rust & Tauri Builds
+debug/
+target/
+**/*.rs.bk
+*.pdb
+**/mutants.out*/
+
+# Python & Hermes Agent
+__pycache__/
+*.pyc
+venv/
+**/venv/
+.env
+uploads/
+output.txt
+agent_test.txt
+models/
+**/models/
+*.onnx
+*.bin
+*.safetensors
+*.pt
+*.pth
+
+# OS Files
+.DS_Store
+Thumbs.db
