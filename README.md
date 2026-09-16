@@ -79,7 +79,7 @@ An autonomous, multi-modal desktop AI assistant and agent engine powered by **Ta
 ### 2. Install Dependencies
 ```bash
 # Clone the repository
-git clone https://github.com/Dimbaja/project-song-.git
+git clone https://github.com/tanoydev607-maker/project-song-.git
 cd project-song-
 
 # Install Node monorepo packages
