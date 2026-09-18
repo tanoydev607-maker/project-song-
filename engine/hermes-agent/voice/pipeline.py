@@ -27,11 +27,7 @@ class RealtimeVoicePipeline:
     def get_status(self) -> dict:
         """Health check status of the 3 pipeline stages."""
         return {
-            "stt": {
-                "engine": "Moonshine Tiny",
-                "ready": self.stt.is_ready,
-                "model_path": str(self.stt.model_path) if self.stt.model_path else None
-            },
+            "stt": self.stt.get_capabilities(),
             "llm": {
                 "engine": "Cloud LLM API Streaming",
                 "default_model": self.llm.default_model
@@ -54,7 +50,7 @@ class RealtimeVoicePipeline:
         Execute the full 3-stage pipeline:
         1. STT: Transcribe user audio with Moonshine Tiny
         2. LLM: Stream answer and chunk sentences
-        3. TTS: Synthesize speech for each sentence with Chatterbox
+        3. TTS: Synthesize speech for each sentence with Kokoro TTS
         """
         pipeline_start = time.perf_counter()
 
@@ -74,7 +70,8 @@ class RealtimeVoicePipeline:
             "type": "voice_stt",
             "text": user_text,
             "latency_ms": stt_latency,
-            "model": stt_result.get("model", "Moonshine Tiny")
+            "model": stt_result.get("model", "Moonshine Tiny"),
+            "device": stt_result.get("device", "Hardware-Optimized INT8 SIMD")
         }
 
         if not user_text:
@@ -125,7 +122,7 @@ class RealtimeVoicePipeline:
 
         llm_task = asyncio.create_task(run_llm_producer())
 
-        # ================= STAGE 3: Chatterbox TTS Synthesis =================
+        # ================= STAGE 3: Kokoro TTS Synthesis =================
         yield {
             "type": "voice_stage",
             "stage": 3,
@@ -144,7 +141,6 @@ class RealtimeVoicePipeline:
             item_type = item.get("type")
 
             if item_type == "token":
-                # Stream LLM token to client UI
                 yield {
                     "type": "voice_llm_token",
                     "token": item["token"]
@@ -154,27 +150,28 @@ class RealtimeVoicePipeline:
                 sentence = item["sentence"]
                 sentence_idx = item["index"]
                 
-                # Synthesize with Kokoro TTS
-                tts_result = await self.tts.synthesize(sentence, voice_config=voice_config)
-                
-                if not first_audio_emitted:
-                    first_audio_emitted = True
-                    time_to_first_audio = round((time.perf_counter() - pipeline_start) * 1000, 2)
-                    yield {
-                        "type": "voice_metrics",
-                        "time_to_first_audio_ms": time_to_first_audio
-                    }
+                tts_text = sentence.strip()
+                if tts_text:
+                    tts_result = await self.tts.synthesize(tts_text, voice_config=voice_config)
+                    
+                    if not first_audio_emitted:
+                        first_audio_emitted = True
+                        time_to_first_audio = round((time.perf_counter() - pipeline_start) * 1000, 2)
+                        yield {
+                            "type": "voice_metrics",
+                            "time_to_first_audio_ms": time_to_first_audio
+                        }
 
-                yield {
-                    "type": "voice_tts_chunk",
-                    "index": sentence_idx,
-                    "text": sentence,
-                    "audio_b64": tts_result["audio_b64"],
-                    "mime_type": tts_result["mime_type"],
-                    "latency_ms": tts_result["latency_ms"],
-                    "engine": tts_result["engine"],
-                    "voice": tts_result.get("voice", "")
-                }
+                    yield {
+                        "type": "voice_tts_chunk",
+                        "index": sentence_idx,
+                        "text": tts_text,
+                        "audio_b64": tts_result["audio_b64"],
+                        "mime_type": tts_result["mime_type"],
+                        "latency_ms": tts_result["latency_ms"],
+                        "engine": tts_result["engine"],
+                        "voice": tts_result.get("voice", "")
+                    }
 
             elif item_type == "done":
                 full_llm_text = item.get("full_text", "")

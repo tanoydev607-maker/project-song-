@@ -97,6 +97,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
     "Kokoro TTS 82M model from nazdridoy is active, verified, and operational on Songbird AI."
   );
   const [isPlayingTestAudio, setIsPlayingTestAudio] = useState<boolean>(false);
+  const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Voice Blending State
@@ -130,6 +131,17 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
           if (caps.blended_voices) setBlendedVoices(caps.blended_voices);
           if (caps.device) setDevice(caps.device);
           if (caps.model_ready !== undefined) setIsModelReady(caps.model_ready);
+        } else if (
+          data.type === "kokoro_synthesize_result" ||
+          data.type === "chatterbox_synthesize_result"
+        ) {
+          if (data.msg_id?.startsWith("preview_")) {
+            if (data.audio_b64) {
+              playAudioBase64(data.audio_b64, data.mime_type || "audio/wav");
+            } else {
+              setPreviewingVoiceId(null);
+            }
+          }
         } else if (
           data.type === "kokoro_verification" ||
           data.type === "chatterbox_verification"
@@ -173,11 +185,21 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
       const audio = new Audio(audioUrl);
       audioRef.current = audio;
       setIsPlayingTestAudio(true);
-      audio.onended = () => setIsPlayingTestAudio(false);
-      audio.onerror = () => setIsPlayingTestAudio(false);
-      audio.play().catch(() => setIsPlayingTestAudio(false));
+      audio.onended = () => {
+        setIsPlayingTestAudio(false);
+        setPreviewingVoiceId(null);
+      };
+      audio.onerror = () => {
+        setIsPlayingTestAudio(false);
+        setPreviewingVoiceId(null);
+      };
+      audio.play().catch(() => {
+        setIsPlayingTestAudio(false);
+        setPreviewingVoiceId(null);
+      });
     } catch {
       setIsPlayingTestAudio(false);
+      setPreviewingVoiceId(null);
     }
   };
 
@@ -185,7 +207,29 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
     if (audioRef.current) {
       audioRef.current.pause();
       setIsPlayingTestAudio(false);
+      setPreviewingVoiceId(null);
     }
+  };
+
+  const handlePreviewVoice = (e: React.MouseEvent, voiceId: string, voiceName: string) => {
+    e.stopPropagation();
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    if (previewingVoiceId === voiceId && isPlayingTestAudio) {
+      handleStopAudio();
+      return;
+    }
+    setPreviewingVoiceId(voiceId);
+    socket.send(
+      JSON.stringify({
+        action: "kokoro_synthesize",
+        text: `Hello! I am ${voiceName.split("(")[0].trim()}, synthesized locally by Kokoro 82M.`,
+        voice_config: {
+          voice_id: voiceId,
+          speed: speechSpeed,
+        },
+        msg_id: `preview_${voiceId}`,
+      })
+    );
   };
 
   const handleRunVerification = () => {
@@ -438,7 +482,27 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => handlePreviewVoice(e, p.id, p.name)}
+                              className={`px-2 py-1 rounded-lg border transition text-[11px] font-medium flex items-center gap-1 cursor-pointer ${
+                                previewingVoiceId === p.id && isPlayingTestAudio
+                                  ? "bg-rose-500 text-white border-rose-400 animate-pulse"
+                                  : isDark
+                                  ? "bg-white/5 hover:bg-white/10 text-neutral-300 border-white/10"
+                                  : "bg-black/5 hover:bg-black/10 text-neutral-700 border-black/10"
+                              }`}
+                              title={`Preview ${p.name}`}
+                            >
+                              {previewingVoiceId === p.id && isPlayingTestAudio ? (
+                                <Square size={11} className="fill-current" />
+                              ) : (
+                                <Play size={11} className="fill-current" />
+                              )}
+                              <span>Preview</span>
+                            </button>
+
                             {isSelected ? (
                               <span className="flex items-center gap-1 text-[11px] font-bold text-rose-500 px-2 py-0.5 rounded-full bg-rose-500/20">
                                 <Check size={12} /> Active
@@ -483,11 +547,32 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-semibold">{b.name}</span>
-                            {isSelected && (
-                              <span className="flex items-center gap-1 text-[11px] font-bold text-rose-500 px-2 py-0.5 rounded-full bg-rose-500/20">
-                                <Check size={12} /> Active
-                              </span>
-                            )}
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={(e) => handlePreviewVoice(e, b.id, b.name)}
+                                className={`px-2 py-1 rounded-lg border transition text-[11px] font-medium flex items-center gap-1 cursor-pointer ${
+                                  previewingVoiceId === b.id && isPlayingTestAudio
+                                    ? "bg-rose-500 text-white border-rose-400 animate-pulse"
+                                    : isDark
+                                    ? "bg-white/5 hover:bg-white/10 text-neutral-300 border-white/10"
+                                    : "bg-black/5 hover:bg-black/10 text-neutral-700 border-black/10"
+                                }`}
+                                title={`Preview ${b.name}`}
+                              >
+                                {previewingVoiceId === b.id && isPlayingTestAudio ? (
+                                  <Square size={11} className="fill-current" />
+                                ) : (
+                                  <Play size={11} className="fill-current" />
+                                )}
+                                <span>Preview</span>
+                              </button>
+                              {isSelected && (
+                                <span className="flex items-center gap-1 text-[11px] font-bold text-rose-500 px-2 py-0.5 rounded-full bg-rose-500/20">
+                                  <Check size={12} /> Active
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <p className="text-xs text-neutral-400 mt-1">{b.description}</p>
                         </div>

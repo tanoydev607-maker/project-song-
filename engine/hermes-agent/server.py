@@ -18,10 +18,19 @@ import pypdf
 try:
     from voice.pipeline import RealtimeVoicePipeline
     voice_pipeline = RealtimeVoicePipeline()
-    print("[Hermes Engine] Realtime Voice Pipeline initialized (Moonshine Tiny STT + LLM API + Kokoro TTS)")
+    print("[Hermes Engine] Realtime Voice Pipeline initialized successfully (Moonshine Tiny + Kokoro TTS)")
 except Exception as _e:
-    print(f"[Hermes Engine] Voice pipeline deferred initialization: {_e}")
+    print(f"[Hermes Engine] Voice pipeline initialization notice: {_e}")
     voice_pipeline = None
+
+# Hermes Built-in Tool Registry Discovery
+try:
+    from tools.registry import registry, discover_builtin_tools
+    _discovered_tool_modules = discover_builtin_tools()
+    print(f"[Hermes Engine] Discovered {len(registry._tools)} built-in Hermes tools across {len(_discovered_tool_modules)} modules")
+except Exception as _tool_err:
+    print(f"[Hermes Engine] Notice discovering Hermes tools: {_tool_err}")
+    registry = None
 
 if sys.platform == "win32":
 
@@ -86,30 +95,128 @@ def is_model_vision_capable(model_id: str) -> bool:
         return False
     return any(k in mid for k in VISION_MODEL_KEYWORDS)
 
-AGENT_BASE_PROMPT = (
-    "You are Songbird Agent, an autonomous execution AI powered by Hermes Engine. "
-    "You have real execution tools on the local machine to process documents, pictures, code, and shell commands.\n\n"
-    "Available Tools:\n"
-    "1. process_document(file_path: str) -> Extract text, tables, and paginated structure from PDF (with scanned page OCR recovery), DOCX, XLSX, PPTX, CSV, JSON, Jupyter Notebooks (.ipynb), and text files.\n"
-    "2. vision_analyze(image_path: str, prompt: str) -> Inspect image metadata (resolution, format, channels), perform OCR, and analyze visual elements.\n"
-    "3. execute_python(code: str) -> Run Python code with PIL, pypdf, json, csv, os, sys, math, and data processing libraries.\n"
-    "4. execute_command(command: str) -> Run shell / PowerShell commands in workspace.\n"
-    "5. write_file(file_path: str, content: str) -> Create or overwrite files.\n"
-    "6. read_file(file_path: str) -> Read file contents directly.\n"
-    "7. list_directory(path: str) -> List directory files and folders.\n"
-    "8. web_search(query: str) -> Search DuckDuckGo / Instant answers for real-time info.\n\n"
-    "TOOL CALL FORMAT:\n"
-    "To use a tool, you MUST output a <tool_call> XML block containing JSON:\n"
-    "<tool_call>\n"
-    '{"name": "process_document", "arguments": {"file_path": "uploads/document.pdf"}}\n'
-    "</tool_call>\n\n"
-    "You can think step-by-step using <think>...</think>, then call tools, inspect results, and synthesize a final answer."
+def build_tools_system_prompt(enabled_tools: list[str] = None, custom_tools: list[dict] = None) -> str:
+    """Dynamically format active built-in Hermes tools and user custom tools for the agent prompt."""
+    lines = [
+        "You are Songbird Agent, an autonomous execution AI powered by Hermes Engine.",
+        "You have real execution tools on the local machine to process documents, pictures, code, desktop actions, and shell commands.\n",
+        "## AVAILABLE TOOLS:"
+    ]
+    
+    songbird_tools = [
+        ("process_document", "file_path: str", "Extract text, tables, and paginated structure from PDF (with scanned page OCR recovery), DOCX, XLSX, PPTX, CSV, JSON, and Jupyter Notebooks (.ipynb)."),
+        ("vision_analyze", "image_path: str, prompt: str", "Inspect image metadata (resolution, format, channels), perform OCR, and analyze visual elements."),
+        ("execute_python", "code: str", "Run Python code with PIL, pypdf, json, csv, os, sys, math, and data processing libraries."),
+        ("execute_command", "command: str", "Run shell / PowerShell commands in workspace."),
+        ("write_file", "file_path: str, content: str", "Create or overwrite files."),
+        ("read_file", "file_path: str", "Read file contents directly."),
+        ("list_directory", "path: str = '.'", "List directory files and folders."),
+        ("web_search", "query: str", "Search DuckDuckGo / Instant answers for real-time info."),
+    ]
+    
+    enabled_set = set(enabled_tools) if enabled_tools else None
+    
+    idx = 1
+    for name, params, desc in songbird_tools:
+        if enabled_set is None or name in enabled_set:
+            lines.append(f"{idx}. {name}({params}) -> {desc}")
+            idx += 1
+            
+    if registry:
+        for name, entry in list(registry._tools.items()):
+            if enabled_set is not None and name not in enabled_set:
+                continue
+            if any(name == sb[0] for sb in songbird_tools):
+                continue
+            
+            props = entry.schema.get("parameters", {}).get("properties", {})
+            reqs = set(entry.schema.get("parameters", {}).get("required", []))
+            param_parts = []
+            for p, pdef in list(props.items())[:6]:
+                ptype = pdef.get("type", "any")
+                param_parts.append(f"{p}: {ptype}" if p in reqs else f"{p}?: {ptype}")
+            param_str = ", ".join(param_parts)
+            desc_short = (entry.description or entry.schema.get("description", "")).strip().split("\n")[0][:130]
+            lines.append(f"{idx}. {name}({param_str}) -> {desc_short}")
+            idx += 1
+            
+    if custom_tools and isinstance(custom_tools, list):
+        for ct in custom_tools:
+            c_name = ct.get("name", "")
+            c_desc = ct.get("description", "")
+            c_params = ct.get("parameters", [])
+            param_parts = []
+            for cp in c_params:
+                pname = cp.get("name", "")
+                ptype = cp.get("type", "string")
+                preq = cp.get("required", False)
+                param_parts.append(f"{pname}: {ptype}" if preq else f"{pname}?: {ptype}")
+            lines.append(f"{idx}. {c_name}({', '.join(param_parts)}) -> [Custom Tool: {ct.get('executionType', 'shell')}] {c_desc}")
+            idx += 1
+
+    if enabled_set is None or "computer_use" in enabled_set:
+        lines.append(
+            "\n### COMPUTER USE GUIDANCE:\n"
+            "When using `computer_use`:\n"
+            "1. Call `computer_use` with `action='capture'` and `mode='som'` (Set-of-Mark) to get an interactive numbered element map of the screen.\n"
+            "2. Then interact using element indices: `action='click', element=N` or `action='type', text='...', element=N`.\n"
+            "3. Use `action='key', keys='cmd+s'` or `keys='enter'` for keyboard shortcuts.\n"
+            "4. Supported actions: capture, click, double_click, right_click, drag, scroll, type, key, wait, list_apps, focus_app."
+        )
+
+    lines.append(
+        "\nTOOL CALL FORMAT:\n"
+        "To execute a tool, output a <tool_call> XML block containing JSON:\n"
+        "<tool_call>\n"
+        '{"name": "tool_name", "arguments": {"arg_key": "arg_value"}}\n'
+        "</tool_call>\n\n"
+        "CRITICAL FORMATTING RULES:\n"
+        "- NO EMOJIS: Never output emojis or emoticons in your responses under any circumstances. Always write pure, clean text.\n"
+        "- MATH IN LATEX: Always format all mathematical expressions, equations, formulas, variables, and calculations using standard LaTeX notation ($...$ for inline math, $$...$$ for standalone display equations). Never output raw ASCII pseudo-math.\n\n"
+        "You can think step-by-step using <think>...</think>, then call tools, inspect results, and synthesize a final answer."
+    )
+    return "\n".join(lines)
+
+AGENT_BASE_PROMPT = build_tools_system_prompt()
+
+EMOJI_PATTERN = re.compile(
+    r"["
+    r"\U0001F600-\U0001F64F"  # emoticons
+    r"\U0001F300-\U0001F5FF"  # symbols & pictographs
+    r"\U0001F680-\U0001F6FF"  # transport & map symbols
+    r"\U0001F1E0-\U0001F1FF"  # flags
+    r"\U0001F700-\U0001F77F"  # alchemical symbols
+    r"\U0001F780-\U0001F7FF"  # geometric shapes extended
+    r"\U0001F800-\U0001F8FF"  # supplemental arrows-c
+    r"\U0001F900-\U0001F9FF"  # supplemental symbols and pictographs
+    r"\U0001FA00-\U0001FA6F"  # chess symbols
+    r"\U0001FA70-\U0001FAFF"  # symbols and pictographs extended-a
+    r"\U00002702-\U000027B0"  # dingbats
+    r"\U000024C2-\U0001F251"  # enclosed characters
+    r"\U0001F004-\U0001F0CF"  # domino, mahjong, playing cards
+    r"\U00002600-\U000026FF"  # miscellaneous symbols
+    r"\U00002300-\U000023FF"  # miscellaneous technical
+    r"\U0000FE0F"              # variation selector-16
+    r"\U0000200D"              # zero-width joiner
+    r"]+",
+    flags=re.UNICODE
 )
+
+def strip_emojis(text: str) -> str:
+    """Remove any emojis or emoticons from text, preserving all regular text and LaTeX math formulas."""
+    if not text:
+        return ""
+    return EMOJI_PATTERN.sub("", text)
 
 DEFAULT_SYSTEM_PROMPT = (
     "You are Songbird, an advanced AI agent specialized in deep reasoning, software architecture, "
     "picture & document processing, and synthesis. Structure your answers with clear markdown formatting and "
-    "syntax-highlighted code blocks."
+    "syntax-highlighted code blocks.\n\n"
+    "CRITICAL FORMATTING RULES:\n"
+    "1. NO EMOJIS: Do NOT use any emojis or emoticons in your responses under any circumstances. Always write pure, clean text.\n"
+    "2. MATH IN LATEX: Always write all mathematical expressions, equations, formulas, variables, and calculations using standard LaTeX notation. "
+    "Use $...$ for inline math (e.g. $E = mc^2$, $\\alpha + \\beta = \\gamma$) and $$...$$ for standalone display equations "
+    "(e.g. $$\\int_{0}^{\\infty} e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}$$). Never output raw ASCII pseudo-math."
 )
 
 def normalize_model_id(raw_model: str, provider: str) -> str:
@@ -562,36 +669,111 @@ async def tool_web_search(query: str) -> str:
     except Exception as e:
         return f"[Search error]: {str(e)}"
 
-async def execute_agent_tool(tool_name: str, args: dict, api_key: str = "", base_url: str = "") -> str:
-    """Dispatch tool call."""
-    name = tool_name.lower().strip()
-    if "document" in name or name == "process_document":
+async def execute_agent_tool(tool_name: str, args: dict, api_key: str = "", base_url: str = "", custom_tools: list[dict] = None) -> tuple[str, str | None]:
+    """Dispatch tool call to Custom Tools, Songbird Handlers, or Hermes Registry (computer_use, etc.)."""
+    name = tool_name.strip()
+    name_lower = name.lower()
+
+    # 1. Check Custom Tools
+    if custom_tools and isinstance(custom_tools, list):
+        for ct in custom_tools:
+            if ct.get("name", "").strip().lower() == name_lower:
+                exec_type = ct.get("executionType", "shell").lower()
+                if exec_type == "shell":
+                    template = ct.get("commandTemplate", "")
+                    cmd = template
+                    for k, v in args.items():
+                        cmd = cmd.replace(f"{{{k}}}", str(v))
+                    out = await tool_execute_command(cmd)
+                    return out, None
+                elif exec_type == "python":
+                    script = ct.get("scriptBody", "")
+                    wrapped_code = f"import json, sys\nargs = {json.dumps(args)}\n" + script
+                    out = await tool_execute_python(wrapped_code)
+                    return out, None
+                elif exec_type == "prompt":
+                    directive = ct.get("promptDirective", "")
+                    return f"[Custom Tool Directive '{name}']:\n{directive}\nArguments: {json.dumps(args)}", None
+
+    # 2. Check Songbird Built-in Tools
+    if "document" in name_lower or name_lower == "process_document":
         fp = args.get("file_path") or args.get("path") or ""
-        return await tool_process_document(fp, api_key=api_key, base_url=base_url)
-    elif "image" in name or "vision" in name or name == "vision_analyze" or name == "process_image":
+        out = await tool_process_document(fp, api_key=api_key, base_url=base_url)
+        return out, None
+    elif "image" in name_lower or "vision" in name_lower or name_lower in ("vision_analyze", "process_image"):
         fp = args.get("image_path") or args.get("image") or args.get("path") or ""
         prompt = args.get("prompt") or "Analyze and describe this image in detail."
-        return await tool_vision_analyze(fp, prompt, api_key=api_key, base_url=base_url)
-    elif "python" in name or name == "execute_python":
+        out = await tool_vision_analyze(fp, prompt, api_key=api_key, base_url=base_url)
+        return out, None
+    elif name_lower == "execute_python":
         code = args.get("code") or args.get("script") or ""
-        return await tool_execute_python(code)
-    elif "command" in name or name == "execute_command" or name == "terminal":
+        out = await tool_execute_python(code)
+        return out, None
+    elif name_lower == "execute_command":
         cmd = args.get("command") or args.get("cmd") or ""
-        return await tool_execute_command(cmd)
-    elif "write" in name or name == "write_file":
+        out = await tool_execute_command(cmd)
+        return out, None
+    elif name_lower == "write_file":
         fp = args.get("file_path") or args.get("path") or "output.txt"
         cnt = args.get("content") or args.get("text") or ""
-        return await tool_write_file(fp, cnt)
-    elif "read" in name or name == "read_file":
+        out = await tool_write_file(fp, cnt)
+        return out, None
+    elif name_lower == "read_file":
         fp = args.get("file_path") or args.get("path") or ""
-        return await tool_read_file(fp, api_key=api_key, base_url=base_url)
-    elif "list" in name or name == "list_directory":
+        out = await tool_read_file(fp, api_key=api_key, base_url=base_url)
+        return out, None
+    elif name_lower == "list_directory":
         p = args.get("path") or "."
-        return await tool_list_directory(p)
-    elif "search" in name or name == "web_search":
+        out = await tool_list_directory(p)
+        return out, None
+    elif name_lower == "web_search":
         q = args.get("query") or args.get("q") or ""
-        return await tool_web_search(q)
-    return f"[Unknown tool: {tool_name}]"
+        out = await tool_web_search(q)
+        return out, None
+
+    # 3. Check Hermes Tool Registry (supports all 81+ Hermes tools including computer_use)
+    if registry:
+        matched_entry = registry.get_entry(name) or registry.get_entry(name_lower)
+        if matched_entry:
+            canonical_name = matched_entry.name
+            try:
+                raw_res = registry.dispatch(canonical_name, args)
+                # Handle multimodal result (e.g. computer_use screen capture)
+                if isinstance(raw_res, dict) and raw_res.get("_multimodal"):
+                    content_list = raw_res.get("content", [])
+                    extracted_img = None
+                    text_parts = []
+                    for item in content_list:
+                        if isinstance(item, dict):
+                            if item.get("type") == "image_url":
+                                url = item.get("image_url", {}).get("url", "")
+                                if url:
+                                    extracted_img = url
+                            elif item.get("type") == "text":
+                                text_parts.append(item.get("text", ""))
+                    summary = raw_res.get("text_summary") or "\n".join(text_parts)
+                    return summary, extracted_img
+                elif isinstance(raw_res, dict):
+                    return json.dumps(raw_res, indent=2, default=str), None
+                elif isinstance(raw_res, str):
+                    return raw_res, None
+                else:
+                    return str(raw_res), None
+            except Exception as e:
+                return f"[Tool '{name}' Execution Error]: {str(e)}", None
+
+    # 4. Fallback Aliases
+    if name_lower in ("terminal", "bash", "shell", "sh", "cmd"):
+        cmd = args.get("command") or args.get("cmd") or ""
+        out = await tool_execute_command(cmd)
+        return out, None
+
+    if "python" in name_lower:
+        code = args.get("code") or args.get("script") or ""
+        out = await tool_execute_python(code)
+        return out, None
+
+    return f"[Unknown tool: {tool_name}. Please inspect available tools in Songbird Tools window.]", None
 
 # ==================== SAVE UPLOADED ATTACHMENTS TO WORKSPACE ====================
 
@@ -682,7 +864,7 @@ async def query_model_complete(messages: list[dict], model_name: str, api_key: s
 
 # ==================== AGENT EXECUTION LOOP ====================
 
-async def run_hermes_agent_loop(websocket, messages: list[dict], raw_model_name: str, api_key: str, base_url: str, temperature: float = 0.5, custom_agent_prompt: str = "", max_steps: int = 6):
+async def run_hermes_agent_loop(websocket, messages: list[dict], raw_model_name: str, api_key: str, base_url: str, temperature: float = 0.5, custom_agent_prompt: str = "", max_steps: int = 6, enabled_tools: list[str] = None, custom_tools: list[dict] = None):
     """Multi-step ReAct Autonomous Agent Execution Loop with Tool Calling, Task Roadmap & Active Skills."""
     model_name = normalize_model_id(raw_model_name, "openrouter" if "openrouter" in base_url else "other")
     
@@ -717,15 +899,16 @@ async def run_hermes_agent_loop(websocket, messages: list[dict], raw_model_name:
         except Exception as e:
             await websocket.send(json.dumps({
                 "type": "stream",
-                "token": f"\n\n❌ **Agent Error:** {str(e)}"
+                "token": f"\n\n**Agent Error:** {str(e)}"
             }))
             return
 
         # Check for <think> blocks
         thought_match = re.search(r"<think>(.*?)</think>", full_response, re.DOTALL)
         if thought_match:
-            thought_text = thought_match.group(1).strip()
-            await websocket.send(json.dumps({"type": "thought", "token": thought_text + "\n"}))
+            thought_text = strip_emojis(thought_match.group(1).strip())
+            if thought_text:
+                await websocket.send(json.dumps({"type": "thought", "token": thought_text + "\n"}))
 
         # Check for <tool_call> blocks
         tool_matches = re.findall(r"<tool_call>(.*?)</tool_call>", full_response, re.DOTALL)
@@ -741,11 +924,12 @@ async def run_hermes_agent_loop(websocket, messages: list[dict], raw_model_name:
                     {"id": "plan", "title": "Analyze problem & plan execution trajectory", "status": "completed"},
                     {"id": "tool_exec", "title": f"Executed tools successfully ({executed_tools_count} actions)" if executed_tools_count > 0 else "Direct reasoning execution", "status": "completed"},
                     {"id": "verify", "title": "Inspected outputs & verified results", "status": "completed"},
-                    {"id": "synthesize", "title": "Synthesizing final solution & code deliverable", "status": "running"}
+                    {"id": "synthesize", "title": "Synthesize final solution & code deliverable", "status": "running"}
                 ]
             }))
 
             clean_text = re.sub(r"<think>.*?</think>", "", full_response, flags=re.DOTALL).strip()
+            clean_text = strip_emojis(clean_text)
             tokens = re.findall(r"\S+|\n|\s+", clean_text)
             for t in tokens:
                 await websocket.send(json.dumps({"type": "stream", "token": t}))
@@ -767,8 +951,12 @@ async def run_hermes_agent_loop(websocket, messages: list[dict], raw_model_name:
             tool_label = f"Vision analyzing: {tool_args.get('image_path', '')}"
         elif "python" in tool_name:
             tool_label = "Executing Python data pipeline..."
-        elif "command" in tool_name:
-            tool_label = f"Running command: {tool_args.get('command', '')[:35]}..."
+        elif "command" in tool_name or tool_name == "terminal":
+            tool_label = f"Running command: {tool_args.get('command', tool_args.get('cmd', ''))[:35]}..."
+        elif tool_name == "computer_use":
+            tool_label = f"Computer Use: {tool_args.get('action', 'capture')}..."
+        else:
+            tool_label = f"Executing {tool_name}..."
 
         await websocket.send(json.dumps({
             "type": "agent_progress",
@@ -795,16 +983,26 @@ async def run_hermes_agent_loop(websocket, messages: list[dict], raw_model_name:
         # Execute tool
         print(f"[Hermes Agent] Executing tool: {tool_name} with args: {tool_args}")
         sys.stdout.flush()
-        tool_output = await execute_agent_tool(tool_name, tool_args, api_key=api_key, base_url=base_url)
+        tool_output, tool_image = await execute_agent_tool(
+            tool_name,
+            tool_args,
+            api_key=api_key,
+            base_url=base_url,
+            custom_tools=custom_tools
+        )
 
         # Notify client of tool result
-        await websocket.send(json.dumps({
+        result_payload = {
             "type": "tool_result",
             "tool_id": tool_id,
             "tool": tool_name,
             "output": tool_output,
-            "status": "error" if "[Error" in tool_output or "[Exception" in tool_output else "success"
-        }))
+            "status": "error" if ("[Error" in tool_output or "[Exception" in tool_output) else "success"
+        }
+        if tool_image:
+            result_payload["image_b64"] = tool_image
+
+        await websocket.send(json.dumps(result_payload))
 
         # Update progress after tool result
         await websocket.send(json.dumps({
@@ -849,18 +1047,30 @@ async def run_hermes_agent_loop(websocket, messages: list[dict], raw_model_name:
 # ==================== STREAMING & CLIENT HANDLER ====================
 
 async def send_typing_stream(websocket, token: str, is_thought: bool = False):
-    """Stream tokens with realistic typewriter pacing."""
+    """Stream tokens with realistic typewriter pacing, stripping any emojis."""
+    clean_token = strip_emojis(token)
+    if not clean_token:
+        return
     msg_type = "thought" if is_thought else "stream"
-    if len(token) <= 4:
-        await websocket.send(json.dumps({"type": msg_type, "token": token}))
+    if len(clean_token) <= 4:
+        await websocket.send(json.dumps({"type": msg_type, "token": clean_token}))
     else:
-        for i in range(0, len(token), 3):
-            sub = token[i:i+3]
+        for i in range(0, len(clean_token), 3):
+            sub = clean_token[i:i+3]
             await websocket.send(json.dumps({"type": msg_type, "token": sub}))
             await asyncio.sleep(0.008)
 
-async def stream_openai_compatible(websocket, messages: list[dict], raw_model_name: str, api_key: str, base_url: str, temperature: float = 0.7):
-    """Standard conversational streaming with multi-modal picture/document payload support."""
+async def stream_openai_compatible(
+    websocket,
+    messages: list[dict],
+    raw_model_name: str,
+    api_key: str,
+    base_url: str,
+    temperature: float = 0.7,
+    auto_speak: bool = False,
+    voice_config: dict = None
+):
+    """Standard conversational streaming with multi-modal picture/document and Kokoro TTS read-aloud support."""
     model_name = normalize_model_id(raw_model_name, "openrouter" if "openrouter" in base_url else "other")
     endpoint = f"{base_url.rstrip('/')}/chat/completions"
     headers = {
@@ -886,6 +1096,7 @@ async def stream_openai_compatible(websocket, messages: list[dict], raw_model_na
     sys.stdout.flush()
 
     in_think_block = False
+    full_response_text = ""
 
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
@@ -901,7 +1112,7 @@ async def stream_openai_compatible(websocket, messages: list[dict], raw_model_na
 
                     await websocket.send(json.dumps({
                         "type": "stream",
-                        "token": f"❌ **Provider Error ({response.status_code}):**\n\n{err_msg}\n\n*Model: `{model_name}`*"
+                        "token": f"**Provider Error ({response.status_code}):**\n\n{err_msg}\n\n*Model: `{model_name}`*"
                     }))
                     return
 
@@ -930,6 +1141,7 @@ async def stream_openai_compatible(websocket, messages: list[dict], raw_model_na
                                     in_think_block = True
                                     parts = content_chunk.split("<think>", 1)
                                     if parts[0]:
+                                        full_response_text += parts[0]
                                         await send_typing_stream(websocket, parts[0], is_thought=False)
                                     if len(parts) > 1 and parts[1]:
                                         await send_typing_stream(websocket, parts[1], is_thought=True)
@@ -941,21 +1153,39 @@ async def stream_openai_compatible(websocket, messages: list[dict], raw_model_na
                                     if parts[0]:
                                         await send_typing_stream(websocket, parts[0], is_thought=True)
                                     if len(parts) > 1 and parts[1]:
+                                        full_response_text += parts[1]
                                         await send_typing_stream(websocket, parts[1], is_thought=False)
                                     continue
 
                                 if in_think_block:
                                     await send_typing_stream(websocket, content_chunk, is_thought=True)
                                 else:
+                                    full_response_text += content_chunk
                                     await send_typing_stream(websocket, content_chunk, is_thought=False)
 
                         except json.JSONDecodeError:
                             continue
 
+        if auto_speak and full_response_text.strip() and voice_pipeline:
+            try:
+                synth_res = await voice_pipeline.tts.synthesize(strip_emojis(full_response_text.strip()), voice_config=voice_config)
+                await websocket.send(json.dumps({
+                    "type": "kokoro_synthesize_result",
+                    "msg_id": "auto_reply",
+                    "audio_b64": synth_res.get("audio_b64", ""),
+                    "mime_type": synth_res.get("mime_type", "audio/wav"),
+                    "engine": synth_res.get("engine", "Kokoro TTS"),
+                    "voice": synth_res.get("voice", "af_bella"),
+                    "latency_ms": synth_res.get("latency_ms", 0)
+                }))
+            except Exception as _e:
+                print(f"[Hermes Engine] Kokoro auto speech error: {_e}")
+                sys.stdout.flush()
+
     except Exception as e:
         await websocket.send(json.dumps({
             "type": "stream",
-            "token": f"\n\n❌ **Connection Error:** {str(e)}"
+            "token": f"\n\n**Connection Error:** {str(e)}"
         }))
 
 async def handle_client(websocket):
@@ -1080,13 +1310,9 @@ async def handle_client(websocket):
                         from voice.pipeline import RealtimeVoicePipeline
                         voice_pipeline = RealtimeVoicePipeline()
                     except Exception as _e:
+                        err_type = "kokoro_synthesize_error" if action.startswith("kokoro") else "chatterbox_synthesize_error"
                         await websocket.send(json.dumps({
-                            "type": "kokoro_synthesize_error",
-                            "error": f"Failed to initialize voice pipeline: {_e}",
-                            "msg_id": data.get("msg_id")
-                        }))
-                        await websocket.send(json.dumps({
-                            "type": "chatterbox_synthesize_error",
+                            "type": err_type,
                             "error": f"Failed to initialize voice pipeline: {_e}",
                             "msg_id": data.get("msg_id")
                         }))
@@ -1097,14 +1323,10 @@ async def handle_client(websocket):
                 voice_config = data.get("voice_config")
 
                 if not synth_text:
-                    err_msg = "Empty text supplied for Kokoro synthesis"
+                    err_msg = "Empty text supplied for synthesis"
+                    err_type = "kokoro_synthesize_error" if action.startswith("kokoro") else "chatterbox_synthesize_error"
                     await websocket.send(json.dumps({
-                        "type": "kokoro_synthesize_error",
-                        "error": err_msg,
-                        "msg_id": msg_id
-                    }))
-                    await websocket.send(json.dumps({
-                        "type": "chatterbox_synthesize_error",
+                        "type": err_type,
                         "error": err_msg,
                         "msg_id": msg_id
                     }))
@@ -1112,8 +1334,9 @@ async def handle_client(websocket):
 
                 try:
                     synth_res = await voice_pipeline.tts.synthesize(synth_text, voice_config=voice_config)
+                    out_type = "kokoro_synthesize_result" if action.startswith("kokoro") else "chatterbox_synthesize_result"
                     res_payload = {
-                        "type": "kokoro_synthesize_result",
+                        "type": out_type,
                         "msg_id": msg_id,
                         "audio_b64": synth_res.get("audio_b64", ""),
                         "mime_type": synth_res.get("mime_type", "audio/wav"),
@@ -1122,21 +1345,39 @@ async def handle_client(websocket):
                         "latency_ms": synth_res.get("latency_ms", 0)
                     }
                     await websocket.send(json.dumps(res_payload))
-                    res_payload_alias = dict(res_payload)
-                    res_payload_alias["type"] = "chatterbox_synthesize_result"
-                    await websocket.send(json.dumps(res_payload_alias))
                 except Exception as e:
+                    err_type = "kokoro_synthesize_error" if action.startswith("kokoro") else "chatterbox_synthesize_error"
                     await websocket.send(json.dumps({
-                        "type": "kokoro_synthesize_error",
-                        "error": str(e),
-                        "msg_id": msg_id
-                    }))
-                    await websocket.send(json.dumps({
-                        "type": "chatterbox_synthesize_error",
+                        "type": err_type,
                         "error": str(e),
                         "msg_id": msg_id
                     }))
                 continue
+
+            if action == "stt_transcribe":
+                if not voice_pipeline:
+                    try:
+                        from voice.pipeline import RealtimeVoicePipeline
+                        voice_pipeline = RealtimeVoicePipeline()
+                    except Exception as _e:
+                        await websocket.send(json.dumps({
+                            "type": "stt_error",
+                            "error": f"Failed to initialize voice pipeline: {_e}"
+                        }))
+                        continue
+
+                audio_payload = data.get("audio", "")
+                stt_res = voice_pipeline.stt.transcribe(audio_payload)
+                await websocket.send(json.dumps({
+                    "type": "stt_result",
+                    "text": stt_res.get("text", ""),
+                    "latency_ms": stt_res.get("latency_ms", 0),
+                    "model": stt_res.get("model", "Moonshine Tiny"),
+                    "device": stt_res.get("device", "Hardware-Optimized INT8 SIMD"),
+                    "error": stt_res.get("error")
+                }))
+                continue
+
 
             if action == "voice_turn":
                 if not voice_pipeline:
@@ -1181,6 +1422,8 @@ async def handle_client(websocket):
                 continue
 
             is_agent_mode = bool(data.get("agent_mode", False))
+            enabled_tools = data.get("enabled_tools", None)
+            custom_tools = data.get("custom_tools", [])
 
             provider = (data.get("provider") or "openrouter").lower()
             api_key = data.get("api_key", "").strip()
@@ -1205,7 +1448,17 @@ async def handle_client(websocket):
                             skills_prompt += f"Role & Purpose: {s_desc}\n"
                         skills_prompt += f"Instructions: {s_inst}\n\n"
 
-            full_system_prompt = (AGENT_BASE_PROMPT if is_agent_mode else system_prompt) + skills_prompt
+            if is_agent_mode:
+                effective_system_prompt = build_tools_system_prompt(enabled_tools=enabled_tools, custom_tools=custom_tools)
+            else:
+                effective_system_prompt = system_prompt
+            full_system_prompt = effective_system_prompt + skills_prompt
+            if "NO EMOJIS" not in full_system_prompt:
+                full_system_prompt += (
+                    "\n\nCRITICAL OUTPUT FORMATTING REQUIREMENTS:\n"
+                    "- NO EMOJIS: Do NOT include any emojis or emoticons in your responses under any circumstances. Always write pure, clean text.\n"
+                    "- MATH IN LATEX: Always write all mathematical expressions, equations, formulas, variables, and calculations using standard LaTeX notation ($...$ for inline math, $$...$$ for standalone display equations). Never output raw ASCII pseudo-math."
+                )
 
             base_url = custom_base_url or PROVIDER_BASE_URLS.get(provider, "https://openrouter.ai/api/v1")
             is_vision_model = is_model_vision_capable(model_name)
@@ -1282,9 +1535,28 @@ async def handle_client(websocket):
                 summary_prompt = str(messages[-1]['content'])[:60]
                 print(f"[Hermes Engine] Initiating AGENT MODE for: {summary_prompt}... (with {len(skills_list)} skills, {len(saved_uploads)} uploads)")
                 sys.stdout.flush()
-                await run_hermes_agent_loop(websocket, messages, model_name, api_key, base_url, temperature, custom_agent_prompt=full_system_prompt)
+                await run_hermes_agent_loop(
+                    websocket,
+                    messages,
+                    model_name,
+                    api_key,
+                    base_url,
+                    temperature,
+                    custom_agent_prompt=full_system_prompt,
+                    enabled_tools=enabled_tools,
+                    custom_tools=custom_tools
+                )
             else:
-                await stream_openai_compatible(websocket, messages, model_name, api_key, base_url, temperature)
+                await stream_openai_compatible(
+                    websocket,
+                    messages,
+                    model_name,
+                    api_key,
+                    base_url,
+                    temperature=temperature,
+                    auto_speak=bool(data.get("speak", False) or data.get("auto_tts", False)),
+                    voice_config=data.get("voice_config")
+                )
 
             try:
                 await websocket.send(json.dumps({"type": "done"}))
@@ -1302,15 +1574,31 @@ async def main():
     print(f"[Hermes Engine] Active Vision Candidates: {VISION_FALLBACK_CANDIDATES}")
     sys.stdout.flush()
 
-    async with websockets.serve(
-        handle_client,
-        "localhost",
-        PORT,
-        ping_interval=None,
-        ping_timeout=None,
-        max_size=None
-    ):
-        await asyncio.get_running_loop().create_future()
+    server = None
+    for attempt in range(1, 10):
+        try:
+            server = await websockets.serve(
+                handle_client,
+                "127.0.0.1",
+                PORT,
+                ping_interval=None,
+                ping_timeout=None,
+                max_size=None
+            )
+            print(f"[Hermes Engine] Server listening on ws://127.0.0.1:{PORT}")
+            sys.stdout.flush()
+            break
+        except OSError as e:
+            if attempt < 9:
+                print(f"[Hermes Engine] Port {PORT} busy (attempt {attempt}/9). Waiting 1s...")
+                sys.stdout.flush()
+                await asyncio.sleep(1.0)
+            else:
+                raise e
+
+    if server:
+        async with server:
+            await asyncio.get_running_loop().create_future()
 
 if __name__ == "__main__":
     try:

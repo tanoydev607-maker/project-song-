@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { Terminal, Code, FileText, Globe, CheckCircle2, XCircle, Loader2, ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
+import { Terminal, Code, FileText, Globe, CheckCircle2, XCircle, Loader2, ChevronDown, ChevronRight, Copy, Check, Monitor, Eye, Brain, Sparkles, Wrench } from "lucide-react";
 
 export interface ToolExecution {
   id: string;
   tool: string;
   input: string | Record<string, any>;
   output?: string;
+  image_b64?: string;
   status: "running" | "success" | "error";
   timestamp: number;
 }
@@ -20,6 +21,34 @@ export const AgentToolCard: React.FC<AgentToolCardProps> = ({ execution }) => {
 
   const getToolMeta = (toolName: string) => {
     const t = toolName.toLowerCase();
+    if (t === "computer_use") {
+      return {
+        icon: <Monitor size={15} className="text-indigo-400" />,
+        label: "OS & Desktop Control",
+        badgeColor: "bg-indigo-950/60 border-indigo-800/50 text-indigo-300",
+      };
+    }
+    if (t.startsWith("browser_")) {
+      return {
+        icon: <Globe size={15} className="text-blue-400" />,
+        label: "Browser Automation",
+        badgeColor: "bg-blue-950/60 border-blue-800/50 text-blue-300",
+      };
+    }
+    if (t.includes("vision") || t.includes("image") || t.includes("video") || t.includes("flux")) {
+      return {
+        icon: <Eye size={15} className="text-rose-400" />,
+        label: "Vision & Media Pipeline",
+        badgeColor: "bg-rose-950/60 border-rose-800/50 text-rose-300",
+      };
+    }
+    if (t.includes("todo") || t.includes("memory") || t.includes("session") || t.includes("clarify") || t.includes("delegate")) {
+      return {
+        icon: <Brain size={15} className="text-violet-400" />,
+        label: "Memory & Planning",
+        badgeColor: "bg-violet-950/60 border-violet-800/50 text-violet-300",
+      };
+    }
     if (t.includes("code") || t.includes("python")) {
       return {
         icon: <Code size={15} className="text-emerald-500" />,
@@ -27,7 +56,14 @@ export const AgentToolCard: React.FC<AgentToolCardProps> = ({ execution }) => {
         badgeColor: "bg-emerald-950/60 border-emerald-800/50 text-emerald-300",
       };
     }
-    if (t.includes("file") || t.includes("write") || t.includes("read")) {
+    if (t.includes("document")) {
+      return {
+        icon: <FileText size={15} className="text-cyan-400" />,
+        label: "Document Extraction",
+        badgeColor: "bg-cyan-950/60 border-cyan-800/50 text-cyan-300",
+      };
+    }
+    if (t.includes("file") || t.includes("write") || t.includes("read") || t.includes("patch") || t.includes("list")) {
       return {
         icon: <FileText size={15} className="text-cyan-500" />,
         label: "File System Operation",
@@ -36,14 +72,21 @@ export const AgentToolCard: React.FC<AgentToolCardProps> = ({ execution }) => {
     }
     if (t.includes("web") || t.includes("search")) {
       return {
-        icon: <Globe size={15} className="text-blue-500" />,
+        icon: <Globe size={15} className="text-sky-400" />,
         label: "Web Search & Fetch",
-        badgeColor: "bg-blue-950/60 border-blue-800/50 text-blue-300",
+        badgeColor: "bg-sky-950/60 border-sky-800/50 text-sky-300",
+      };
+    }
+    if (t.includes("custom") || t.startsWith("custom_")) {
+      return {
+        icon: <Sparkles size={15} className="text-teal-400" />,
+        label: "Custom Tool Execution",
+        badgeColor: "bg-teal-950/60 border-teal-800/50 text-teal-300",
       };
     }
     return {
       icon: <Terminal size={15} className="text-amber-500" />,
-      label: "Terminal Command",
+      label: "Terminal & System Command",
       badgeColor: "bg-amber-950/60 border-amber-800/50 text-amber-300",
     };
   };
@@ -137,6 +180,22 @@ export const AgentToolCard: React.FC<AgentToolCardProps> = ({ execution }) => {
               <pre className="p-2.5 rounded-lg bg-[var(--sb-code-bg)] border border-[var(--sb-border)] text-emerald-500 overflow-x-auto whitespace-pre-wrap max-h-48 leading-relaxed">
                 {execution.output}
               </pre>
+            </div>
+          )}
+
+          {/* Screenshot Image (if computer_use or vision returns base64 image) */}
+          {execution.image_b64 && (
+            <div>
+              <div className="text-[10px] uppercase font-semibold tracking-wider text-[var(--sb-text-muted)] mb-1">
+                Visual Capture / Screenshot
+              </div>
+              <div className="rounded-lg overflow-hidden border border-[var(--sb-border)] max-h-72 bg-black/50 flex items-center justify-center">
+                <img
+                  src={execution.image_b64.startsWith("data:") ? execution.image_b64 : `data:image/png;base64,${execution.image_b64}`}
+                  alt="Visual Capture"
+                  className="max-h-72 object-contain"
+                />
+              </div>
             </div>
           )}
         </div>

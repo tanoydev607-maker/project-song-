@@ -33,3 +33,7 @@ models/
 # OS Files
 .DS_Store
 Thumbs.db
+
+# Scratch and Temp
+scratch/
+

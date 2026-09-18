@@ -3,6 +3,7 @@ export interface ToolExecution {
   tool: string;
   input: string | Record<string, any>;
   output?: string;
+  image_b64?: string;
   status: "running" | "success" | "error";
   timestamp: number;
 }

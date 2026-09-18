@@ -126,7 +126,6 @@ pnpm dev:desktop
 # Build standalone production executable (.exe / .msi)
 pnpm --filter orca-app build:tauri
 ```
-
 ---
 
 ## 📄 License

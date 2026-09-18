@@ -1,15 +1,23 @@
 import React, { useState } from "react";
-import { Check, Copy, Code } from "lucide-react";
+import { Check, Copy, Code, Sigma } from "lucide-react";
+import katex from "katex";
+import "katex/dist/katex.min.css";
 
 interface MarkdownRendererProps {
   content: string;
   isStreaming?: boolean;
 }
 
+const stripEmojis = (text: string): string => {
+  if (!text) return "";
+  return text.replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, "");
+};
+
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isStreaming }) => {
+  const cleanContent = stripEmojis(content);
   return (
     <div className={`space-y-3.5 leading-relaxed text-sm md:text-[15px] font-normal tracking-normal ${isStreaming ? "chat-streaming-cursor" : ""}`}>
-      {renderBlocks(content)}
+      {renderBlocks(cleanContent)}
     </div>
   );
 };
@@ -64,6 +72,100 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ language, code }) => {
   );
 };
 
+interface MathBlockProps {
+  math: string;
+}
+
+const MathBlock: React.FC<MathBlockProps> = ({ math }) => {
+  const [copied, setCopied] = useState(false);
+  const cleanMath = math.trim();
+
+  let html = "";
+  let renderError = false;
+  try {
+    html = katex.renderToString(cleanMath, {
+      displayMode: true,
+      throwOnError: false,
+    });
+  } catch {
+    renderError = true;
+  }
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(cleanMath);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback
+    }
+  };
+
+  return (
+    <div className="my-4 rounded-xl overflow-hidden border border-[var(--sb-border)] bg-[var(--sb-code-bg)] shadow-sm">
+      <div className="flex items-center justify-between px-4 py-2 bg-[var(--sb-code-header)] border-b border-[var(--sb-border)] text-[var(--sb-text-secondary)]">
+        <div className="flex items-center gap-1.5 font-sans font-medium text-xs">
+          <Sigma size={14} className="text-rose-500" />
+          <span>LaTeX Equation</span>
+        </div>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md hover:bg-[var(--sb-hover-bg)] text-[var(--sb-text-secondary)] hover:text-[var(--sb-text-primary)] transition"
+          title="Copy LaTeX formula"
+        >
+          {copied ? (
+            <>
+              <Check size={13} className="text-emerald-500" />
+              <span className="text-emerald-500 font-medium">Copied</span>
+            </>
+          ) : (
+            <>
+              <Copy size={13} />
+              <span>Copy LaTeX</span>
+            </>
+          )}
+        </button>
+      </div>
+      <div className="p-4 overflow-x-auto text-[var(--sb-text-primary)] select-text flex justify-center items-center min-h-[52px]">
+        {renderError || !html ? (
+          <pre className="font-mono text-xs text-rose-400 select-text">
+            <code>{cleanMath}</code>
+          </pre>
+        ) : (
+          <div
+            className="w-full text-center overflow-x-auto py-1"
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+const InlineMath: React.FC<{ math: string }> = ({ math }) => {
+  const cleanMath = math.trim();
+  let html = "";
+  try {
+    html = katex.renderToString(cleanMath, {
+      displayMode: false,
+      throwOnError: false,
+    });
+  } catch {
+    return (
+      <code className="px-1 py-0.5 rounded-md bg-[var(--sb-code-bg)] text-rose-500 font-mono text-xs border border-[var(--sb-code-border)]">
+        ${cleanMath}$
+      </code>
+    );
+  }
+
+  return (
+    <span
+      className="inline-block px-1 align-baseline text-[var(--sb-text-primary)]"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+};
+
 function renderBlocks(markdown: string): React.ReactNode[] {
   if (!markdown) return [];
 
@@ -76,6 +178,9 @@ function renderBlocks(markdown: string): React.ReactNode[] {
   let tableBuffer: string[] = [];
   let inTable = false;
 
+  let inMath = false;
+  let mathBuffer: string[] = [];
+
   const flushTable = () => {
     if (tableBuffer.length > 0) {
       nodes.push(renderTable(tableBuffer, `table-${nodes.length}`));
@@ -84,11 +189,20 @@ function renderBlocks(markdown: string): React.ReactNode[] {
     }
   };
 
+  const flushMath = () => {
+    if (mathBuffer.length > 0) {
+      nodes.push(<MathBlock key={`mathblock-${nodes.length}`} math={mathBuffer.join("\n")} />);
+      mathBuffer = [];
+      inMath = false;
+    }
+  };
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const trimmed = line.trim();
 
     // Check for code blocks
-    if (line.trim().startsWith("```")) {
+    if (trimmed.startsWith("```")) {
       if (inCode) {
         nodes.push(
           <CodeBlock
@@ -102,8 +216,9 @@ function renderBlocks(markdown: string): React.ReactNode[] {
         codeLang = "";
       } else {
         flushTable();
+        flushMath();
         inCode = true;
-        codeLang = line.trim().slice(3).trim();
+        codeLang = trimmed.slice(3).trim();
       }
       continue;
     }
@@ -113,17 +228,48 @@ function renderBlocks(markdown: string): React.ReactNode[] {
       continue;
     }
 
+    // Check for display math blocks ($$...$$)
+    if (inMath) {
+      if (trimmed.endsWith("$$")) {
+        const content = trimmed.slice(0, -2).trim();
+        if (content) mathBuffer.push(content);
+        flushMath();
+      } else {
+        mathBuffer.push(line);
+      }
+      continue;
+    }
+
+    if (trimmed.startsWith("$$")) {
+      flushTable();
+      if (trimmed.length > 2 && trimmed.endsWith("$$")) {
+        // Single-line block equation: $$ formula $$
+        nodes.push(
+          <MathBlock
+            key={`mathblock-${nodes.length}`}
+            math={trimmed.slice(2, -2).trim()}
+          />
+        );
+      } else {
+        // Multi-line block equation start
+        inMath = true;
+        const startContent = trimmed.slice(2).trim();
+        if (startContent) mathBuffer.push(startContent);
+      }
+      continue;
+    }
+
     // Check for Markdown tables
-    if (line.trim().startsWith("|") && line.trim().endsWith("|")) {
+    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
       inTable = true;
-      tableBuffer.push(line.trim());
+      tableBuffer.push(trimmed);
       continue;
     } else if (inTable) {
       flushTable();
     }
 
     // Horizontal rule
-    if (/^(\*\*\*|---|___)$/.test(line.trim())) {
+    if (/^(\*\*\*|---|___)$/.test(trimmed)) {
       nodes.push(<hr key={`hr-${i}`} className="my-4 border-[var(--sb-border)]" />);
       continue;
     }
@@ -181,7 +327,7 @@ function renderBlocks(markdown: string): React.ReactNode[] {
     }
 
     // Empty line
-    if (!line.trim()) {
+    if (!trimmed) {
       continue;
     }
 
@@ -202,6 +348,7 @@ function renderBlocks(markdown: string): React.ReactNode[] {
       />
     );
   }
+  flushMath();
   flushTable();
 
   return nodes;
@@ -213,39 +360,74 @@ function renderInline(text: string): React.ReactNode {
   let keyIdx = 0;
 
   while (remaining.length > 0) {
-    const codeMatch = remaining.match(/^(.*?)`([^`]+)`(.*)$/);
-    const boldMatch = remaining.match(/^(.*?)\*\*([^*]+)\*\*(.*)$/);
-    const linkMatch = remaining.match(/^(.*?)\[([^\]]+)\]\(([^)]+)\)(.*)$/);
+    const codeMatch = remaining.match(/`([^`]+)`/);
+    const boldMatch = remaining.match(/\*\*([^*]+)\*\*/);
+    const linkMatch = remaining.match(/\[([^\]]+)\]\(([^)]+)\)/);
+    const mathMatch = remaining.match(/(?<!\\)\$([^\$\s\n](?:[^\$\n]*?[^\$\s\n])?)\$/);
 
-    if (codeMatch && (!boldMatch || codeMatch[1].length < boldMatch[1].length)) {
-      if (codeMatch[1]) parts.push(<span key={keyIdx++}>{codeMatch[1]}</span>);
+    // Find the earliest match by index
+    let earliestType: "code" | "bold" | "link" | "math" | null = null;
+    let earliestIndex = Infinity;
+
+    if (codeMatch && codeMatch.index !== undefined && codeMatch.index < earliestIndex) {
+      earliestType = "code";
+      earliestIndex = codeMatch.index;
+    }
+    if (boldMatch && boldMatch.index !== undefined && boldMatch.index < earliestIndex) {
+      earliestType = "bold";
+      earliestIndex = boldMatch.index;
+    }
+    if (linkMatch && linkMatch.index !== undefined && linkMatch.index < earliestIndex) {
+      earliestType = "link";
+      earliestIndex = linkMatch.index;
+    }
+    if (mathMatch && mathMatch.index !== undefined && mathMatch.index < earliestIndex) {
+      earliestType = "math";
+      earliestIndex = mathMatch.index;
+    }
+
+    if (!earliestType) {
+      parts.push(<span key={keyIdx++}>{remaining}</span>);
+      break;
+    }
+
+    // Append preceding text before the match
+    if (earliestIndex > 0) {
+      parts.push(<span key={keyIdx++}>{remaining.slice(0, earliestIndex)}</span>);
+    }
+
+    if (earliestType === "code" && codeMatch) {
       parts.push(
         <code key={keyIdx++} className="px-1.5 py-0.5 rounded-md bg-[var(--sb-code-bg)] text-rose-500 font-mono text-xs border border-[var(--sb-code-border)]">
-          {codeMatch[2]}
+          {codeMatch[1]}
         </code>
       );
-      remaining = codeMatch[3];
-    } else if (boldMatch) {
-      if (boldMatch[1]) parts.push(<span key={keyIdx++}>{boldMatch[1]}</span>);
-      parts.push(<strong key={keyIdx++} className="font-semibold text-[var(--sb-text-primary)]">{boldMatch[2]}</strong>);
-      remaining = boldMatch[3];
-    } else if (linkMatch) {
-      if (linkMatch[1]) parts.push(<span key={keyIdx++}>{linkMatch[1]}</span>);
+      remaining = remaining.slice(earliestIndex + codeMatch[0].length);
+    } else if (earliestType === "bold" && boldMatch) {
+      parts.push(
+        <strong key={keyIdx++} className="font-semibold text-[var(--sb-text-primary)]">
+          {renderInline(boldMatch[1])}
+        </strong>
+      );
+      remaining = remaining.slice(earliestIndex + boldMatch[0].length);
+    } else if (earliestType === "link" && linkMatch) {
       parts.push(
         <a
           key={keyIdx++}
-          href={linkMatch[3]}
+          href={linkMatch[2]}
           target="_blank"
           rel="noopener noreferrer"
           className="text-rose-500 hover:underline underline-offset-3"
         >
-          {linkMatch[2]}
+          {linkMatch[1]}
         </a>
       );
-      remaining = linkMatch[4];
-    } else {
-      parts.push(<span key={keyIdx++}>{remaining}</span>);
-      break;
+      remaining = remaining.slice(earliestIndex + linkMatch[0].length);
+    } else if (earliestType === "math" && mathMatch) {
+      parts.push(
+        <InlineMath key={keyIdx++} math={mathMatch[1]} />
+      );
+      remaining = remaining.slice(earliestIndex + mathMatch[0].length);
     }
   }
 

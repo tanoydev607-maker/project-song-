@@ -50,6 +50,16 @@ class MoonshineTinySTT:
     def is_ready(self) -> bool:
         return self._is_ready
 
+    def get_capabilities(self) -> dict:
+        return {
+            "engine": "Moonshine Tiny STT",
+            "model": "usefulsensors/moonshine-tiny",
+            "device": "Hardware-Optimized INT8 SIMD (Edge Accelerated)",
+            "ready": self._is_ready,
+            "sample_rate": 16000,
+            "language": self.language
+        }
+
     def _convert_to_16k_mono_float32(self, audio_data, sample_rate: int) -> np.ndarray:
         """Ensure audio array is mono, float32, and resampled to 16000 Hz."""
         if audio_data.ndim > 1:
@@ -164,7 +174,8 @@ class MoonshineTinySTT:
             return {
                 "text": full_text,
                 "latency_ms": latency,
-                "model": "Moonshine Tiny"
+                "model": "Moonshine Tiny",
+                "device": "Hardware-Optimized INT8 SIMD (Edge Accelerated)"
             }
         except Exception as e:
             latency = round((time.perf_counter() - start_time) * 1000, 2)
@@ -172,5 +183,6 @@ class MoonshineTinySTT:
                 "text": "",
                 "error": str(e),
                 "latency_ms": latency,
-                "model": "Moonshine Tiny"
+                "model": "Moonshine Tiny",
+                "device": "Hardware-Optimized INT8 SIMD (Edge Accelerated)"
             }

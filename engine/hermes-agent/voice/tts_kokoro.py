@@ -150,31 +150,89 @@ class KokoroTTSEngine:
         self.models_dir = os.path.join(base_dir, "models", "kokoro")
         self.onnx_path = os.path.join(self.models_dir, "kokoro-v1.0.onnx")
         self.voices_path = os.path.join(self.models_dir, "voices-v1.0.bin")
+        self.active_device = "Initializing..."
+        self._load_event = threading.Event()
 
         if auto_load_background and KOKORO_AVAILABLE:
             threading.Thread(target=self._init_kokoro_background, daemon=True).start()
+        elif not auto_load_background:
+            self._load_event.set()
 
     @property
     def is_kokoro_ready(self) -> bool:
+        if not self._is_kokoro_loaded and not self._load_event.is_set():
+            self._load_event.wait(timeout=6.0)
         return self._is_kokoro_loaded and self.kokoro_model is not None
+
+    def _create_accelerated_kokoro_model(self):
+        """
+        Create Kokoro model instance leveraging GPU acceleration where supported:
+        1. CUDA (NVIDIA GPU)
+        2. DirectML (AMD Radeon / Intel / DirectX 12 GPU) with runtime probe
+        3. High-performance multi-threaded CPU fallback (AVX2/SIMD)
+        """
+        import onnxruntime as ort
+        available = ort.get_available_providers()
+        print(f"[TTS: Kokoro] Available ONNX providers: {available}")
+
+        # 1. Probe CUDA (NVIDIA GPU)
+        if "CUDAExecutionProvider" in available:
+            try:
+                opts = ort.SessionOptions()
+                opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+                sess = ort.InferenceSession(self.onnx_path, sess_options=opts, providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
+                model = Kokoro.from_session(sess, self.voices_path)
+                # Quick warmup probe to ensure CUDA memory and kernel compatibility
+                _ = model.create("a", voice="af_bella", speed=1.0, lang="en-us")
+                self.active_device = "GPU (CUDA - NVIDIA)"
+                return model
+            except Exception as e:
+                print(f"[TTS: Kokoro] CUDA probe notice ({e}). Trying next provider...")
+
+        # 2. Probe DirectML (AMD Radeon / Intel / DirectX 12 GPU)
+        if "DmlExecutionProvider" in available:
+            try:
+                dml_opts = ort.SessionOptions()
+                dml_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+                dml_opts.enable_mem_pattern = False
+                sess = ort.InferenceSession(self.onnx_path, sess_options=dml_opts, providers=["DmlExecutionProvider", "CPUExecutionProvider"])
+                model = Kokoro.from_session(sess, self.voices_path)
+                # Test synthesis probe to check operator kernel compatibility
+                _ = model.create("a", voice="af_bella", speed=1.0, lang="en-us")
+                self.active_device = "GPU (DirectML - DirectX 12)"
+                return model
+            except Exception as e:
+                print(f"[TTS: Kokoro] DirectML probe notice ({e}). Switching to multi-threaded CPU...")
+
+        # 3. Optimized Multi-threaded CPU with AVX2 SIMD
+        cpu_opts = ort.SessionOptions()
+        cpu_opts.intra_op_num_threads = os.cpu_count() or 4
+        cpu_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        sess = ort.InferenceSession(self.onnx_path, sess_options=cpu_opts, providers=["CPUExecutionProvider"])
+        model = Kokoro.from_session(sess, self.voices_path)
+        self.active_device = f"CPU (Optimized Multi-Threaded AVX2, {os.cpu_count() or 4} cores)"
+        return model
 
     def _init_kokoro_background(self):
         """Asynchronously load Kokoro TTS ONNX weights in a background thread."""
         if self._init_attempted or not KOKORO_AVAILABLE:
+            self._load_event.set()
             return
         self._init_attempted = True
 
         try:
             if os.path.exists(self.onnx_path) and os.path.exists(self.voices_path):
                 print(f"[TTS: Kokoro] Loading Kokoro-82M ONNX model from: {self.onnx_path}...")
-                self.kokoro_model = Kokoro(self.onnx_path, self.voices_path)
+                self.kokoro_model = self._create_accelerated_kokoro_model()
                 self._is_kokoro_loaded = True
-                print("[TTS: Kokoro] Kokoro-82M TTS initialized successfully!")
+                print(f"[TTS: Kokoro] Kokoro-82M TTS initialized successfully on {self.active_device}!")
             else:
                 print(f"[TTS: Kokoro] Model files not found yet in '{self.models_dir}'. Fallback engines active.")
         except Exception as e:
             print(f"[TTS: Kokoro] Kokoro initialization notice: {e}. Fallback engines will be used.")
             self._is_kokoro_loaded = False
+        finally:
+            self._load_event.set()
 
     def get_capabilities(self) -> dict:
         """Inspect and return Kokoro TTS engine specifications and active settings."""
@@ -186,7 +244,7 @@ class KokoroTTSEngine:
             "engine": "Kokoro TTS",
             "model_name": "Kokoro-82M TTS (nazdridoy/kokoro-tts)",
             "model_id": "hexgrad/Kokoro-82M",
-            "device": "ONNX Runtime (CPU / DirectML)",
+            "device": self.active_device,
             "sample_rate": 24000,
             "model_ready": self.is_kokoro_ready,
             "architecture": {
@@ -300,7 +358,7 @@ class KokoroTTSEngine:
             "model_name": "Kokoro-82M TTS (nazdridoy/kokoro-tts)",
             "model_id": "hexgrad/Kokoro-82M",
             "model_class": "kokoro_onnx.Kokoro",
-            "device": "ONNX Runtime (CPU / DirectML)",
+            "device": self.active_device,
             "sample_rate": sr,
             "components": {
                 "kokoro_onnx_package": KOKORO_AVAILABLE,
@@ -448,6 +506,7 @@ class KokoroTTSEngine:
                     "mime_type": "audio/wav",
                     "latency_ms": latency,
                     "engine": f"Kokoro-82M TTS ({voice_id})",
+                    "device": self.active_device,
                     "voice": voice_id,
                     "text": clean_text
                 }

@@ -1,0 +1,3939 @@
+[
+  {
+    "id": "process_document",
+    "name": "process_document",
+    "label": "Document OCR & Structure Extractor",
+    "category": "File System & Documents",
+    "toolset": "songbird",
+    "description": "Extract text, tables, and paginated structure from PDF (with scanned page OCR recovery), DOCX, XLSX, PPTX, CSV, JSON, and Jupyter Notebooks (.ipynb).",
+    "parameters": [
+      {
+        "name": "file_path",
+        "type": "string",
+        "description": "Path to target document in workspace or uploads",
+        "required": true
+      }
+    ],
+    "enabled": true,
+    "available": true
+  },
+  {
+    "id": "execute_python",
+    "name": "execute_python",
+    "label": "Python Data & Math Pipeline",
+    "category": "Code Execution",
+    "toolset": "songbird",
+    "description": "Execute Python scripts in the engine environment with numpy, PIL, pypdf, math, csv, json, and system libraries.",
+    "parameters": [
+      {
+        "name": "code",
+        "type": "string",
+        "description": "Python script code to execute",
+        "required": true
+      }
+    ],
+    "enabled": true,
+    "available": true
+  },
+  {
+    "id": "execute_command",
+    "name": "execute_command",
+    "label": "PowerShell & Shell Runner",
+    "category": "Terminal & Processes",
+    "toolset": "songbird",
+    "description": "Execute shell commands or PowerShell scripts in the workspace directory.",
+    "parameters": [
+      {
+        "name": "command",
+        "type": "string",
+        "description": "Shell or PowerShell command string to execute",
+        "required": true
+      }
+    ],
+    "enabled": true,
+    "available": true
+  },
+  {
+    "id": "list_directory",
+    "name": "list_directory",
+    "label": "Directory Explorer",
+    "category": "File System & Documents",
+    "toolset": "songbird",
+    "description": "List contents and subdirectories of any path in workspace.",
+    "parameters": [
+      {
+        "name": "path",
+        "type": "string",
+        "description": "Path to directory (default .)",
+        "required": false
+      }
+    ],
+    "enabled": true,
+    "available": true
+  },
+  {
+    "id": "browser_cdp",
+    "name": "browser_cdp",
+    "label": "Browser Cdp",
+    "category": "Browser Automation",
+    "toolset": "browser-cdp",
+    "description": "Send a raw Chrome DevTools Protocol (CDP) command. Escape hatch for browser operations not covered by browser_navigate, browser_click, browser_console, etc.\n\n**Requires a reachable CDP endpoint.** Available when the user has run '/browser connect' to attach to a running Chrome, Brave, Chromium, or Edge browser, or when 'browser.cdp_url' is set in c",
+    "parameters": [
+      {
+        "name": "method",
+        "type": "string",
+        "description": "CDP method name, e.g. 'Target.getTargets', 'Runtime.evaluate', 'Page.handleJavaScriptDialog'.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "params",
+        "type": "object",
+        "description": "Method-specific parameters as a JSON object. Omit or pass {} for methods that take no parameters.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "target_id",
+        "type": "string",
+        "description": "Optional. Target/tab ID from Target.getTargets result (each entry's 'targetId'). Use for page-level methods at the top-l",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "frame_id",
+        "type": "string",
+        "description": "Optional. Out-of-process iframe (OOPIF) frame_id from browser_snapshot.frame_tree.children[] where is_oopif=true. When s",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "timeout",
+        "type": "number",
+        "description": "Timeout in seconds (default 30, max 300).",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": "Requires Playwright Chromium"
+  },
+  {
+    "id": "browser_dialog",
+    "name": "browser_dialog",
+    "label": "Browser Dialog",
+    "category": "Browser Automation",
+    "toolset": "browser-cdp",
+    "description": "Respond to a native JavaScript dialog (alert / confirm / prompt / beforeunload) that is currently blocking the page.\n\n**Workflow:** call ``browser_snapshot`` first \u2014 if a dialog is open, it appears in the ``pending_dialogs`` field with ``id``, ``type``, and ``message``. Then call this tool with ``action='accept'`` or ``action='dismiss'``.\n\n**Prompt",
+    "parameters": [
+      {
+        "name": "action",
+        "type": "string",
+        "description": "'accept' clicks OK / returns the prompt text. 'dismiss' clicks Cancel / returns null from prompt(). For ``beforeunload``",
+        "required": true,
+        "enum": [
+          "accept",
+          "dismiss"
+        ]
+      },
+      {
+        "name": "prompt_text",
+        "type": "string",
+        "description": "Response string for a ``prompt()`` dialog. Ignored for other dialog types. Defaults to empty string.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "dialog_id",
+        "type": "string",
+        "description": "Specific dialog to respond to, from ``browser_snapshot.pending_dialogs[].id``. Required only when multiple dialogs are q",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": "Requires Playwright Chromium"
+  },
+  {
+    "id": "browser_navigate",
+    "name": "browser_navigate",
+    "label": "Browser Navigate",
+    "category": "Browser Automation",
+    "toolset": "browser",
+    "description": "Navigate to a URL in the browser. Initializes the session and loads the page. Must be called before other browser tools. For simple information retrieval, prefer web_search or web_extract (faster, cheaper). For plain-text endpoints \u2014 URLs ending in .md, .txt, .json, .yaml, .yml, .csv, .xml, raw.githubusercontent.com, or any documented API endpoint ",
+    "parameters": [
+      {
+        "name": "url",
+        "type": "string",
+        "description": "The URL to navigate to (e.g., 'https://example.com')",
+        "required": true,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": false,
+    "requirementHint": "Requires Playwright Chromium"
+  },
+  {
+    "id": "browser_snapshot",
+    "name": "browser_snapshot",
+    "label": "Browser Snapshot",
+    "category": "Browser Automation",
+    "toolset": "browser",
+    "description": "Get a text-based snapshot of the current page's accessibility tree. Returns interactive elements with ref IDs (like @e1, @e2) for browser_click and browser_type. full=false (default): compact view with interactive elements. full=true: complete page content. Snapshots over 15000 chars are truncated or LLM-summarized; when that happens the complete s",
+    "parameters": [
+      {
+        "name": "full",
+        "type": "boolean",
+        "description": "If true, returns complete page content. If false (default), returns compact view with interactive elements only.",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": false,
+    "requirementHint": "Requires Playwright Chromium"
+  },
+  {
+    "id": "browser_click",
+    "name": "browser_click",
+    "label": "Browser Click",
+    "category": "Browser Automation",
+    "toolset": "browser",
+    "description": "Click on an element identified by its ref ID from the snapshot (e.g., '@e5'). The ref IDs are shown in square brackets in the snapshot output. Requires browser_navigate and browser_snapshot to be called first.",
+    "parameters": [
+      {
+        "name": "ref",
+        "type": "string",
+        "description": "The element reference from the snapshot (e.g., '@e5', '@e12')",
+        "required": true,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": false,
+    "requirementHint": "Requires Playwright Chromium"
+  },
+  {
+    "id": "browser_type",
+    "name": "browser_type",
+    "label": "Browser Type",
+    "category": "Browser Automation",
+    "toolset": "browser",
+    "description": "Type text into an input field identified by its ref ID. Clears the field first, then types the new text. Requires browser_navigate and browser_snapshot to be called first.",
+    "parameters": [
+      {
+        "name": "ref",
+        "type": "string",
+        "description": "The element reference from the snapshot (e.g., '@e3')",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "text",
+        "type": "string",
+        "description": "The text to type into the field",
+        "required": true,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": false,
+    "requirementHint": "Requires Playwright Chromium"
+  },
+  {
+    "id": "browser_scroll",
+    "name": "browser_scroll",
+    "label": "Browser Scroll",
+    "category": "Browser Automation",
+    "toolset": "browser",
+    "description": "Scroll the page in a direction. Use this to reveal more content that may be below or above the current viewport. Requires browser_navigate to be called first.",
+    "parameters": [
+      {
+        "name": "direction",
+        "type": "string",
+        "description": "Direction to scroll",
+        "required": true,
+        "enum": [
+          "up",
+          "down"
+        ]
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": "Requires Playwright Chromium"
+  },
+  {
+    "id": "browser_back",
+    "name": "browser_back",
+    "label": "Browser Back",
+    "category": "Browser Automation",
+    "toolset": "browser",
+    "description": "Navigate back to the previous page in browser history. Requires browser_navigate to be called first.",
+    "parameters": [],
+    "enabled": false,
+    "available": false,
+    "requirementHint": "Requires Playwright Chromium"
+  },
+  {
+    "id": "browser_press",
+    "name": "browser_press",
+    "label": "Browser Press",
+    "category": "Browser Automation",
+    "toolset": "browser",
+    "description": "Press a keyboard key. Useful for submitting forms (Enter), navigating (Tab), or keyboard shortcuts. Requires browser_navigate to be called first.",
+    "parameters": [
+      {
+        "name": "key",
+        "type": "string",
+        "description": "Key to press (e.g., 'Enter', 'Tab', 'Escape', 'ArrowDown')",
+        "required": true,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": "Requires Playwright Chromium"
+  },
+  {
+    "id": "browser_get_images",
+    "name": "browser_get_images",
+    "label": "Browser Get Images",
+    "category": "Browser Automation",
+    "toolset": "browser",
+    "description": "Get a list of all images on the current page with their URLs and alt text. Useful for finding images to analyze with the vision tool. Requires browser_navigate to be called first.",
+    "parameters": [],
+    "enabled": false,
+    "available": false,
+    "requirementHint": "Requires Playwright Chromium"
+  },
+  {
+    "id": "browser_vision",
+    "name": "browser_vision",
+    "label": "Browser Vision",
+    "category": "Browser Automation",
+    "toolset": "browser",
+    "description": "Take a screenshot of the current page so you can inspect it visually. Use this when you need to understand what the page looks like - especially for CAPTCHAs, visual verification challenges, complex layouts, or cases where the text snapshot misses important visual information. When your active model has native vision, the screenshot is attached to ",
+    "parameters": [
+      {
+        "name": "question",
+        "type": "string",
+        "description": "What you want to know about the page visually. Be specific about what you're looking for.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "annotate",
+        "type": "boolean",
+        "description": "If true, overlay numbered [N] labels on interactive elements. Each [N] maps to ref @eN for subsequent browser commands. ",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": "Requires Playwright Chromium"
+  },
+  {
+    "id": "browser_console",
+    "name": "browser_console",
+    "label": "Browser Console",
+    "category": "Browser Automation",
+    "toolset": "browser",
+    "description": "Get browser console output and JavaScript errors from the current page. Returns console.log/warn/error/info messages and uncaught JS exceptions. Use this to detect silent JavaScript errors, failed API calls, and application warnings. Requires browser_navigate to be called first. When 'expression' is provided, evaluates JavaScript in the page contex",
+    "parameters": [
+      {
+        "name": "clear",
+        "type": "boolean",
+        "description": "If true, clear the message buffers after reading",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "expression",
+        "type": "string",
+        "description": "JavaScript expression to evaluate in the page context. Runs in the browser like DevTools console \u2014 full access to DOM, w",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": "Requires Playwright Chromium"
+  },
+  {
+    "id": "clarify",
+    "name": "clarify",
+    "label": "Clarify",
+    "category": "Memory & Planning",
+    "toolset": "clarify",
+    "description": "Ask the user a question when you need clarification, feedback, or a decision before proceeding. Supports three modes:\n\n1. **Single-select multiple choice** \u2014 provide up to 4 choices. The user picks one or types their own answer via a 5th 'Other' option.\n2. **Multi-select multiple choice** \u2014 set multi_select=true. The user can select multiple option",
+    "parameters": [
+      {
+        "name": "question",
+        "type": "string",
+        "description": "The question itself, and ONLY the question (e.g. 'Which deployment target?'). Do NOT embed the answer options here \u2014 pas",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "choices",
+        "type": "array",
+        "description": "REQUIRED whenever you are presenting selectable options: each distinct option is its own array element (up to 4). The UI",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "multi_select",
+        "type": "boolean",
+        "description": "When true, the user can select MULTIPLE options (like checkboxes). The user_response will be a list of selected choices.",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "process",
+    "name": "process",
+    "label": "Process",
+    "category": "Terminal & Processes",
+    "toolset": "terminal",
+    "description": "Manage background processes started with terminal(background=true). Actions: 'list' (show all), 'poll' (check status + new output), 'log' (full output with pagination), 'wait' (block until done or timeout), 'kill' (terminate), 'write' (send raw stdin data without newline), 'submit' (send data + Enter, for answering prompts), 'close' (close stdin/se",
+    "parameters": [
+      {
+        "name": "action",
+        "type": "string",
+        "description": "Action to perform on background processes",
+        "required": true,
+        "enum": [
+          "list",
+          "poll",
+          "log",
+          "wait",
+          "kill",
+          "write",
+          "submit",
+          "close"
+        ]
+      },
+      {
+        "name": "session_id",
+        "type": "string",
+        "description": "Process session ID (from terminal background output). Required for all actions except 'list'.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "data",
+        "type": "string",
+        "description": "Text to send to process stdin (for 'write' and 'submit' actions)",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "timeout",
+        "type": "integer",
+        "description": "Max seconds to block for 'wait' action. Returns partial output on timeout.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "description": "Line offset for 'log' action (default: last 200 lines)",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "description": "Max lines to return for 'log' action",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "close_terminal",
+    "name": "close_terminal",
+    "label": "Close Terminal",
+    "category": "Terminal & Processes",
+    "toolset": "terminal",
+    "description": "Close the read-only terminal tab for one of your background processes in the Hermes desktop GUI (the tabs mirroring terminal(background=true) runs). This does NOT kill the process \u2014 it only drops the tab/view; the output keeps buffering and the user can reopen it from the status stack. Use it to tidy up when a background process's live terminal is ",
+    "parameters": [
+      {
+        "name": "process_id",
+        "type": "string",
+        "description": "The background process's session id (from terminal(background=true) output or process(action='list')) whose tab should b",
+        "required": true,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "execute_code",
+    "name": "execute_code",
+    "label": "Execute Code",
+    "category": "Code Execution",
+    "toolset": "code_execution",
+    "description": "Run a Python script that can call Hermes tools programmatically. Use this when you need 3+ tool calls with processing logic between them, need to filter/reduce large tool outputs before they enter your context, need conditional branching (if X then Y else Z), or need to loop (fetch N pages, process N files, retry on failure).\n\nUse normal tool calls",
+    "parameters": [
+      {
+        "name": "code",
+        "type": "string",
+        "description": "Python code to execute. Import tools with `from hermes_tools import web_search, terminal, ...` and print your final resu",
+        "required": true,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "computer_use",
+    "name": "computer_use",
+    "label": "Computer Use",
+    "category": "OS & Computer Use",
+    "toolset": "computer_use",
+    "description": "Universal desktop control via cua-driver (macOS, Windows, Linux). Works with any tool-capable model (Anthropic, OpenAI, OpenRouter, local vLLM, etc.). Background computer-use: does NOT steal the user's cursor or keyboard focus.",
+    "parameters": [
+      {
+        "name": "action",
+        "type": "string",
+        "description": "Which action to perform. `capture` is free (no side effects). All other actions require approval unless auto-approved. U",
+        "required": true,
+        "enum": [
+          "capture",
+          "click",
+          "double_click",
+          "right_click",
+          "middle_click",
+          "drag",
+          "scroll",
+          "type",
+          "key",
+          "set_value",
+          "wait",
+          "list_apps",
+          "list_windows",
+          "focus_app",
+          "cua_browser_state",
+          "cua_browser_prepare",
+          "cua_browser_navigate",
+          "cua_browser_click",
+          "cua_browser_type",
+          "cua_browser_pointer",
+          "cua_browser_dialog",
+          "cua_browser_set_input_files",
+          "cua_browser_download"
+        ]
+      },
+      {
+        "name": "mode",
+        "type": "string",
+        "description": "Capture mode. `som` (default) is a screenshot with numbered overlays on every interactable element plus the AX tree \u2014 be",
+        "required": false,
+        "enum": [
+          "som",
+          "vision",
+          "ax"
+        ]
+      },
+      {
+        "name": "app",
+        "type": "string",
+        "description": "Optional. Limit capture/action to a specific app (by name, e.g. 'Safari', or bundle ID, 'com.apple.Safari'). If omitted,",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "pid",
+        "type": "integer",
+        "description": "Optional exact process target for action='capture'. Pair with window_id when discovery cannot resolve an X11 app.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "window_id",
+        "type": "integer",
+        "description": "Optional exact native window target for action='capture'. Pair with pid when an external cua-driver list_windows lookup ",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "max_elements",
+        "type": "integer",
+        "description": "Optional cap on the AX `elements` array returned by `action='capture'`. Default 100, hard maximum 1000. Dense UIs (Elect",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "element",
+        "type": "integer",
+        "description": "The 1-based SOM index returned by the last `capture(mode='som')` call. Strongly preferred over raw coordinates.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "coordinate",
+        "type": "array",
+        "description": "Pixel coordinates [x, y] relative to the captured window screenshot (top-left origin). Only use this if no element index",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "button",
+        "type": "string",
+        "description": "Mouse button. Defaults to left.",
+        "required": false,
+        "enum": [
+          "left",
+          "right",
+          "middle"
+        ]
+      },
+      {
+        "name": "modifiers",
+        "type": "array",
+        "description": "Modifier keys held during the action.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "from_element",
+        "type": "integer",
+        "description": "Source element index (drag).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "to_element",
+        "type": "integer",
+        "description": "Target element index (drag).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "from_coordinate",
+        "type": "array",
+        "description": "Source [x,y] (drag; use when no element available).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "to_coordinate",
+        "type": "array",
+        "description": "Target [x,y] (drag; use when no element available).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "direction",
+        "type": "string",
+        "description": "Scroll direction.",
+        "required": false,
+        "enum": [
+          "up",
+          "down",
+          "left",
+          "right"
+        ]
+      },
+      {
+        "name": "amount",
+        "type": "integer",
+        "description": "Scroll wheel ticks. Default 3.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "value",
+        "type": "string",
+        "description": "For action='set_value': the value to set on the element. For AXPopUpButton / select dropdowns, pass the option's display",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "text",
+        "type": "string",
+        "description": "Text to type (respects the current layout).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "keys",
+        "type": "string",
+        "description": "Key combo, e.g. 'cmd+s', 'ctrl+alt+t', 'return', 'escape', 'tab'. Use '+' to combine.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "seconds",
+        "type": "number",
+        "description": "Seconds to wait. Max 30.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "raise_window",
+        "type": "boolean",
+        "description": "Only for action='focus_app'. If true, brings the window to front (DISRUPTS the user). Default false \u2014 input is routed to",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "delivery_mode",
+        "type": "string",
+        "description": "How input is delivered, for the input actions (click, double_click, right_click, drag, scroll, type, key). `background` ",
+        "required": false,
+        "enum": [
+          "background",
+          "foreground"
+        ]
+      },
+      {
+        "name": "bring_to_front",
+        "type": "boolean",
+        "description": "Optional and only valid with delivery_mode='foreground'. Explicitly invokes cua-driver's standalone bring_to_front tool ",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "tab_id",
+        "type": "string",
+        "description": "Opaque tab capability returned by cua_browser_state.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "ref",
+        "type": "string",
+        "description": "Current semantic ref from the latest cua_browser_state snapshot.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "destination_ref",
+        "type": "string",
+        "description": "Current destination ref for a typed pointer action.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "url",
+        "type": "string",
+        "description": "URL for cua_browser_navigate.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "input_route",
+        "type": "string",
+        "description": "Typed-browser trust class. Defaults to trusted. dom_event is an explicit downgrade and is never selected silently.",
+        "required": false,
+        "enum": [
+          "trusted",
+          "dom_event"
+        ]
+      },
+      {
+        "name": "snapshot_format",
+        "type": "string",
+        "description": "Typed-browser snapshot format; semantic_v2 is the default.",
+        "required": false,
+        "enum": [
+          "semantic_v2",
+          "dom_refs_v1"
+        ]
+      },
+      {
+        "name": "query",
+        "type": "string",
+        "description": "Optional browser-state query.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "scope_ref",
+        "type": "string",
+        "description": "Optional current ref to scope a snapshot.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "continuation",
+        "type": "string",
+        "description": "Continuation minted by the current snapshot.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "profile_mode",
+        "type": "string",
+        "description": "Browser preparation mode. existing_profile is decided by cua-driver's immutable permission mode: standard requires a cer",
+        "required": false,
+        "enum": [
+          "isolated_new",
+          "isolated_named",
+          "existing_profile"
+        ]
+      },
+      {
+        "name": "profile_name",
+        "type": "string",
+        "description": "Name for isolated_named setup.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "allow_launch",
+        "type": "boolean",
+        "description": "Explicitly allow launch of a driver-owned isolated browser.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "browser_pointer_action",
+        "type": "string",
+        "description": "Operation for cua_browser_pointer.",
+        "required": false,
+        "enum": [
+          "hover",
+          "right_click",
+          "double_click",
+          "scroll",
+          "drag"
+        ]
+      },
+      {
+        "name": "browser_dialog_action",
+        "type": "string",
+        "description": "Page JavaScript dialog action; native prompts stay on the native ladder.",
+        "required": false,
+        "enum": [
+          "inspect",
+          "accept",
+          "dismiss"
+        ]
+      },
+      {
+        "name": "browser_type_mode",
+        "type": "string",
+        "description": "Delivery form for cua_browser_type; defaults to insert_text.",
+        "required": false,
+        "enum": [
+          "insert_text",
+          "keystrokes"
+        ]
+      },
+      {
+        "name": "dialog_id",
+        "type": "string",
+        "description": "Opaque page-dialog capability.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "prompt_text",
+        "type": "string",
+        "description": "Optional text for a page prompt dialog.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "files",
+        "type": "array",
+        "description": "Explicit paths for cua_browser_set_input_files.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "destination_root",
+        "type": "string",
+        "description": "Approved destination root for cua_browser_download.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "delta_x",
+        "type": "number",
+        "description": "Typed pointer horizontal delta.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "delta_y",
+        "type": "number",
+        "description": "Typed pointer vertical delta.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "x",
+        "type": "number",
+        "description": "Typed browser viewport x coordinate.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "y",
+        "type": "number",
+        "description": "Typed browser viewport y coordinate.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "to_x",
+        "type": "number",
+        "description": "Typed browser drag destination x.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "to_y",
+        "type": "number",
+        "description": "Typed browser drag destination y.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "capture_after",
+        "type": "boolean",
+        "description": "If true, take a follow-up capture after the action and include it in the response. Saves a round-trip when you need to v",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": false,
+    "requirementHint": "Requires cua-driver in PATH"
+  },
+  {
+    "id": "cronjob",
+    "name": "cronjob",
+    "label": "Cronjob",
+    "category": "Memory & Planning",
+    "toolset": "cronjob",
+    "description": "Manage scheduled cron jobs with a single compressed tool.\n\nUse action='create' to schedule a new job from a prompt or one or more skills.\nUse action='list' to inspect jobs.\nUse action='update', 'pause', 'resume', 'remove', or 'run' to manage an existing job.\n\nTo stop a job the user no longer wants: first action='list' to find the job_id, then actio",
+    "parameters": [
+      {
+        "name": "action",
+        "type": "string",
+        "description": "One of: create, list, update, pause, resume, remove, run. When action=create, the 'schedule' and 'prompt' fields are REQ",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "job_id",
+        "type": "string",
+        "description": "Required for update/pause/resume/remove/run",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "prompt",
+        "type": "string",
+        "description": "For create: the full self-contained prompt. If skills are also provided, this becomes the task instruction paired with t",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "schedule",
+        "type": "string",
+        "description": "REQUIRED for action=create. For create/update: '30m', 'every 2h', '0 9 * * *', or ISO timestamp. Examples: '30m' (every ",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "description": "Optional human-friendly name",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "repeat",
+        "type": "integer",
+        "description": "Optional repeat count. Omit for defaults (once for one-shot, forever for recurring).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "deliver",
+        "type": "string",
+        "description": "Omit this parameter to auto-deliver back to the current chat and topic (recommended). Auto-detection preserves thread/to",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "skills",
+        "type": "array",
+        "description": "Optional ordered list of skill names to load before executing the cron prompt. On update, pass an empty array to clear a",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "script",
+        "type": "string",
+        "description": "Optional path to a script that runs each tick. In the default mode its stdout is injected into the agent's prompt as con",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "no_agent",
+        "type": "boolean",
+        "description": "Default: False (LLM-driven job \u2014 the agent runs the prompt each tick). Set True to skip the LLM entirely: the scheduler ",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "context_from",
+        "type": "array",
+        "description": "Optional job ID or list of job IDs whose most recent completed output is injected into the prompt as context before each",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "enabled_toolsets",
+        "type": "array",
+        "description": "Optional list of toolset names to restrict the job's agent to (e.g. [\"web\", \"terminal\", \"file\", \"delegation\"]). When set",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "workdir",
+        "type": "string",
+        "description": "Optional absolute path to run the job from. When set, AGENTS.md / CLAUDE.md / .cursorrules from that directory are injec",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "attach_to_session",
+        "type": "boolean",
+        "description": "When True, this job becomes CONTINUABLE: the user can reply to its delivery and the agent has the brief in context inste",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "terminal",
+    "name": "terminal",
+    "label": "Terminal",
+    "category": "Terminal & Processes",
+    "toolset": "terminal",
+    "description": "Execute shell commands on a Linux environment. Filesystem, current working directory, and exported environment variables persist between calls.\n\nDo NOT use cat/head/tail to read files \u2014 use read_file instead.\nDo NOT use grep/rg/find to search \u2014 use search_files instead.\nDo NOT use ls to list directories \u2014 use search_files(target='files') instead.\nD",
+    "parameters": [
+      {
+        "name": "command",
+        "type": "string",
+        "description": "The command to execute on the VM",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "background",
+        "type": "boolean",
+        "description": "Run the command in the background. Almost always pair with notify_on_complete=true \u2014 without it, the process runs silent",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "timeout",
+        "type": "integer",
+        "description": "Max seconds to wait (default: 180, foreground max: 600). Returns INSTANTLY when command finishes \u2014 set high for long tas",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "workdir",
+        "type": "string",
+        "description": "Working directory for this command (absolute path). Defaults to the session working directory.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "pty",
+        "type": "boolean",
+        "description": "Run in pseudo-terminal (PTY) mode for interactive CLI tools like Codex, Claude Code, or Python REPL. Only works with loc",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "notify_on_complete",
+        "type": "boolean",
+        "description": "When true (and background=true), you'll be automatically notified exactly once when the process finishes. **This is the ",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "watch_patterns",
+        "type": "array",
+        "description": "Strings to watch for in background process output. HARD RATE LIMIT: at most 1 notification per 15 seconds per process \u2014 ",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "delegate_task",
+    "name": "delegate_task",
+    "label": "Delegate Task",
+    "category": "Memory & Planning",
+    "toolset": "delegation",
+    "description": "Spawn one or more subagents in isolated contexts. Description is rebuilt at every get_definitions() call to reflect the user's current delegation limits.",
+    "parameters": [
+      {
+        "name": "goal",
+        "type": "string",
+        "description": "What the subagent should accomplish. Be specific and self-contained -- the subagent knows nothing about your conversatio",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "context",
+        "type": "string",
+        "description": "Background information the subagent needs: file paths, error messages, project structure, constraints. The more specific",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "tasks",
+        "type": "array",
+        "description": "(rebuilt at get_definitions() time)",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "role",
+        "type": "string",
+        "description": "(rebuilt at get_definitions() time)",
+        "required": false,
+        "enum": [
+          "leaf",
+          "orchestrator"
+        ]
+      },
+      {
+        "name": "background",
+        "type": "boolean",
+        "description": "DEPRECATED / IGNORED. Top-level single and batch delegations run in the background automatically \u2014 you do not need to (a",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "discord",
+    "name": "discord",
+    "label": "Discord",
+    "category": "Integrations & Messaging",
+    "toolset": "discord",
+    "description": "Read and participate in a Discord server.\n\nAvailable actions:\n  search_members(guild_id, query)  \u2014 find members by name prefix\n  fetch_messages(channel_id)  \u2014 recent messages; optional before/after snowflakes\n  create_thread(channel_id, name)  \u2014 create a public thread; optional message_id anchor\n\nUse the channel_id from the current conversation con",
+    "parameters": [
+      {
+        "name": "action",
+        "type": "string",
+        "description": "",
+        "required": true,
+        "enum": [
+          "search_members",
+          "fetch_messages",
+          "create_thread"
+        ]
+      },
+      {
+        "name": "guild_id",
+        "type": "string",
+        "description": "Discord server (guild) ID.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "channel_id",
+        "type": "string",
+        "description": "Discord channel ID.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "user_id",
+        "type": "string",
+        "description": "Discord user ID.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "role_id",
+        "type": "string",
+        "description": "Discord role ID.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "message_id",
+        "type": "string",
+        "description": "Discord message ID.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "query",
+        "type": "string",
+        "description": "Member name prefix to search for (search_members).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "description": "New thread name (create_thread).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "description": "Max results (default 50). Applies to fetch_messages, search_members.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "before",
+        "type": "string",
+        "description": "Snowflake ID for reverse pagination (fetch_messages).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "after",
+        "type": "string",
+        "description": "Snowflake ID for forward pagination (fetch_messages).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "auto_archive_duration",
+        "type": "integer",
+        "description": "Thread archive duration in minutes (create_thread, default 1440).",
+        "required": false,
+        "enum": [
+          60,
+          1440,
+          4320,
+          10080
+        ]
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "discord_admin",
+    "name": "discord_admin",
+    "label": "Discord Admin",
+    "category": "Integrations & Messaging",
+    "toolset": "discord_admin",
+    "description": "Manage a Discord server via the REST API.\n\nAvailable actions:\n  list_guilds()  \u2014 list servers the bot is in\n  server_info(guild_id)  \u2014 server details + member counts\n  list_channels(guild_id)  \u2014 all channels grouped by category\n  channel_info(channel_id)  \u2014 single channel details\n  list_roles(guild_id)  \u2014 roles sorted by position\n  member_info(guil",
+    "parameters": [
+      {
+        "name": "action",
+        "type": "string",
+        "description": "",
+        "required": true,
+        "enum": [
+          "list_guilds",
+          "server_info",
+          "list_channels",
+          "channel_info",
+          "list_roles",
+          "member_info",
+          "list_pins",
+          "pin_message",
+          "unpin_message",
+          "delete_message",
+          "add_role",
+          "remove_role"
+        ]
+      },
+      {
+        "name": "guild_id",
+        "type": "string",
+        "description": "Discord server (guild) ID.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "channel_id",
+        "type": "string",
+        "description": "Discord channel ID.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "user_id",
+        "type": "string",
+        "description": "Discord user ID.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "role_id",
+        "type": "string",
+        "description": "Discord role ID.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "message_id",
+        "type": "string",
+        "description": "Discord message ID.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "query",
+        "type": "string",
+        "description": "Member name prefix to search for (search_members).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "description": "New thread name (create_thread).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "description": "Max results (default 50). Applies to fetch_messages, search_members.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "before",
+        "type": "string",
+        "description": "Snowflake ID for reverse pagination (fetch_messages).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "after",
+        "type": "string",
+        "description": "Snowflake ID for forward pagination (fetch_messages).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "auto_archive_duration",
+        "type": "integer",
+        "description": "Thread archive duration in minutes (create_thread, default 1440).",
+        "required": false,
+        "enum": [
+          60,
+          1440,
+          4320,
+          10080
+        ]
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "feishu_doc_read",
+    "name": "feishu_doc_read",
+    "label": "Feishu Doc Read",
+    "category": "Integrations & Messaging",
+    "toolset": "feishu_doc",
+    "description": "Read Feishu document content",
+    "parameters": [
+      {
+        "name": "doc_token",
+        "type": "string",
+        "description": "The document token (from the document URL or comment context).",
+        "required": true,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "feishu_drive_list_comments",
+    "name": "feishu_drive_list_comments",
+    "label": "Feishu Drive List Comments",
+    "category": "Integrations & Messaging",
+    "toolset": "feishu_drive",
+    "description": "List document comments",
+    "parameters": [
+      {
+        "name": "file_token",
+        "type": "string",
+        "description": "The document file token.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "file_type",
+        "type": "string",
+        "description": "File type (default: docx).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "is_whole",
+        "type": "boolean",
+        "description": "If true, only return whole-document comments.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "page_size",
+        "type": "integer",
+        "description": "Number of comments per page (max 100).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "page_token",
+        "type": "string",
+        "description": "Pagination token for next page.",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "feishu_drive_list_comment_replies",
+    "name": "feishu_drive_list_comment_replies",
+    "label": "Feishu Drive List Comment Replies",
+    "category": "Integrations & Messaging",
+    "toolset": "feishu_drive",
+    "description": "List comment replies",
+    "parameters": [
+      {
+        "name": "file_token",
+        "type": "string",
+        "description": "The document file token.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "comment_id",
+        "type": "string",
+        "description": "The comment ID to list replies for.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "file_type",
+        "type": "string",
+        "description": "File type (default: docx).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "page_size",
+        "type": "integer",
+        "description": "Number of replies per page (max 100).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "page_token",
+        "type": "string",
+        "description": "Pagination token for next page.",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "feishu_drive_reply_comment",
+    "name": "feishu_drive_reply_comment",
+    "label": "Feishu Drive Reply Comment",
+    "category": "Integrations & Messaging",
+    "toolset": "feishu_drive",
+    "description": "Reply to a document comment",
+    "parameters": [
+      {
+        "name": "file_token",
+        "type": "string",
+        "description": "The document file token.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "comment_id",
+        "type": "string",
+        "description": "The comment ID to reply to.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "content",
+        "type": "string",
+        "description": "The reply text content (plain text only, no markdown).",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "file_type",
+        "type": "string",
+        "description": "File type (default: docx).",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "feishu_drive_add_comment",
+    "name": "feishu_drive_add_comment",
+    "label": "Feishu Drive Add Comment",
+    "category": "Integrations & Messaging",
+    "toolset": "feishu_drive",
+    "description": "Add a whole-document comment",
+    "parameters": [
+      {
+        "name": "file_token",
+        "type": "string",
+        "description": "The document file token.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "content",
+        "type": "string",
+        "description": "The comment text content (plain text only, no markdown).",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "file_type",
+        "type": "string",
+        "description": "File type (default: docx).",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "read_file",
+    "name": "read_file",
+    "label": "Read File",
+    "category": "File System & Documents",
+    "toolset": "file",
+    "description": "Read a text file with line numbers and pagination. Use this instead of cat/head/tail in terminal. Output format: 'LINE_NUM|CONTENT'. Suggests similar filenames if not found. Use offset and limit for large files. Reads exceeding ~100K characters are truncated on a line boundary and return a next_offset; continue with offset to read the rest. Jupyter",
+    "parameters": [
+      {
+        "name": "path",
+        "type": "string",
+        "description": "Path to the file to read (absolute, relative, or ~/path)",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "description": "Line number to start reading from (1-indexed, default: 1)",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "description": "Maximum number of lines to read (default: 500, max: 2000)",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "write_file",
+    "name": "write_file",
+    "label": "Write File",
+    "category": "File System & Documents",
+    "toolset": "file",
+    "description": "Write content to a file, completely replacing existing content. Use this instead of echo/cat heredoc in terminal. Creates parent directories automatically. OVERWRITES the entire file \u2014 use 'patch' for targeted edits. Auto-runs syntax checks on .py/.json/.yaml/.toml and other linted languages; only NEW errors introduced by this write are surfaced (p",
+    "parameters": [
+      {
+        "name": "path",
+        "type": "string",
+        "description": "Path to the file to write (will be created if it doesn't exist, overwritten if it does)",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "content",
+        "type": "string",
+        "description": "Complete content to write to the file",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "cross_profile",
+        "type": "boolean",
+        "description": "Opt out of the cross-profile soft guard. Defaults to false. Set true ONLY after explicit user direction to edit another ",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "patch",
+    "name": "patch",
+    "label": "Patch",
+    "category": "File System & Documents",
+    "toolset": "file",
+    "description": "Targeted find-and-replace edits in files. Use this instead of sed/awk in terminal. Uses fuzzy matching (9 strategies) so minor whitespace/indentation differences won't break it. Returns a unified diff. Auto-runs syntax checks after editing.\n\nREPLACE MODE (mode='replace', default): find a unique string and replace it. REQUIRED PARAMETERS: mode, path",
+    "parameters": [
+      {
+        "name": "mode",
+        "type": "string",
+        "description": "Edit mode. 'replace' (default): requires path + old_string + new_string. 'patch': requires patch content only.",
+        "required": true,
+        "enum": [
+          "replace",
+          "patch"
+        ]
+      },
+      {
+        "name": "path",
+        "type": "string",
+        "description": "REQUIRED when mode='replace'. File path to edit.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "old_string",
+        "type": "string",
+        "description": "REQUIRED when mode='replace'. Exact text to find and replace. Must be unique in the file unless replace_all=true. Includ",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "new_string",
+        "type": "string",
+        "description": "REQUIRED when mode='replace'. Replacement text. Pass empty string '' to delete the matched text.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "replace_all",
+        "type": "boolean",
+        "description": "Replace all occurrences instead of requiring a unique match (default: false)",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "patch",
+        "type": "string",
+        "description": "REQUIRED when mode='patch'. V4A format patch content. Format:\n*** Begin Patch\n*** Update File: path/to/file\n@@ context h",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "cross_profile",
+        "type": "boolean",
+        "description": "Opt out of the cross-profile soft guard. Defaults to false. Set true ONLY after explicit user direction to edit another ",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "search_files",
+    "name": "search_files",
+    "label": "Search Files",
+    "category": "File System & Documents",
+    "toolset": "file",
+    "description": "Search file contents or find files by name. Use this instead of grep/rg/find/ls in terminal. Ripgrep-backed, faster than shell equivalents.\n\nContent search (target='content'): Regex search inside files. Output modes: full matches with line numbers, file paths only, or match counts.\n\nFile search (target='files'): Find files by glob pattern (e.g., '*",
+    "parameters": [
+      {
+        "name": "pattern",
+        "type": "string",
+        "description": "Regex pattern for content search, or glob pattern (e.g., '*.py') for file search",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "target",
+        "type": "string",
+        "description": "'content' searches inside file contents, 'files' searches for files by name",
+        "required": false,
+        "enum": [
+          "content",
+          "files"
+        ]
+      },
+      {
+        "name": "path",
+        "type": "string",
+        "description": "Directory or file to search in (default: current working directory)",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "file_glob",
+        "type": "string",
+        "description": "Filter files by pattern in grep mode (e.g., '*.py' to only search Python files)",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "description": "Maximum number of results to return (default: 50)",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "offset",
+        "type": "integer",
+        "description": "Skip first N results for pagination (default: 0)",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "output_mode",
+        "type": "string",
+        "description": "Output format for grep mode: 'content' shows matching lines with line numbers, 'files_only' lists file paths, 'count' sh",
+        "required": false,
+        "enum": [
+          "content",
+          "files_only",
+          "count"
+        ]
+      },
+      {
+        "name": "context",
+        "type": "integer",
+        "description": "Number of context lines before and after each match (grep mode only)",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "bfl_flux3_text_to_video",
+    "name": "bfl_flux3_text_to_video",
+    "label": "Bfl Flux3 Text To Video",
+    "category": "Vision & Media",
+    "toolset": "bfl",
+    "description": "Read bfl_flux3_prompting_guide before your first generation. FLUX 3 text-to-video: generates a clip (with audio) from the prompt alone. Nothing but the prompt anchors the subject here, so research anything with a real, checkable appearance before writing it \u2014 whatever you leave unspecified is filled in for you. Generation takes several minutes: thi",
+    "parameters": [
+      {
+        "name": "prompt",
+        "type": "string",
+        "description": "Generation brief in plain prose (it is interpreted and expanded by a reasoning harness). Order it subject, distinguishin",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "aspect_ratio",
+        "type": "string",
+        "description": "Output aspect ratio. \"auto\" lets the model choose.",
+        "required": false,
+        "enum": [
+          "auto",
+          "21:9",
+          "16:9",
+          "4:3",
+          "1:1",
+          "3:4",
+          "9:16",
+          "9:21"
+        ]
+      },
+      {
+        "name": "duration",
+        "type": "string",
+        "description": "Clip duration in whole seconds (5-20), or \"auto\".",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "resolution",
+        "type": "string",
+        "description": "Output resolution bin.",
+        "required": false,
+        "enum": [
+          "720p"
+        ]
+      },
+      {
+        "name": "generate_audio",
+        "type": "boolean",
+        "description": "Generate synchronized audio.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "grounding",
+        "type": "boolean",
+        "description": "Allow a short research pass before generation.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "seed",
+        "type": "integer",
+        "description": "Optional reproducibility seed.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "version",
+        "type": "string",
+        "description": "Model version pin. Defaults to \"latest\".",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "bfl_flux3_image_to_video",
+    "name": "bfl_flux3_image_to_video",
+    "label": "Bfl Flux3 Image To Video",
+    "category": "Vision & Media",
+    "toolset": "bfl",
+    "description": "Read bfl_flux3_prompting_guide before your first generation. FLUX 3 image-to-video: animates one image as the literal opening frame \u2014 those pixels are frame 0 and the clip moves from there. Media fields accept a local file path (uploaded automatically to Nous-managed temporary storage and deleted when the generation finishes) or a URL. Returns a jo",
+    "parameters": [
+      {
+        "name": "prompt",
+        "type": "string",
+        "description": "Generation brief in plain prose (it is interpreted and expanded by a reasoning harness). Order it subject, distinguishin",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "aspect_ratio",
+        "type": "string",
+        "description": "Output aspect ratio. \"auto\" lets the model choose.",
+        "required": false,
+        "enum": [
+          "auto",
+          "21:9",
+          "16:9",
+          "4:3",
+          "1:1",
+          "3:4",
+          "9:16",
+          "9:21"
+        ]
+      },
+      {
+        "name": "duration",
+        "type": "string",
+        "description": "Clip duration in whole seconds (5-20), or \"auto\".",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "resolution",
+        "type": "string",
+        "description": "Output resolution bin.",
+        "required": false,
+        "enum": [
+          "720p"
+        ]
+      },
+      {
+        "name": "generate_audio",
+        "type": "boolean",
+        "description": "Generate synchronized audio.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "grounding",
+        "type": "boolean",
+        "description": "Allow a short research pass before generation.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "seed",
+        "type": "integer",
+        "description": "Optional reproducibility seed.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "version",
+        "type": "string",
+        "description": "Model version pin. Defaults to \"latest\".",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "input_image",
+        "type": "string",
+        "description": "Exactly one opening-frame image: a local file path or a URL (PNG/JPEG/WebP, up to 10MB).",
+        "required": true,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "bfl_flux3_keyframes_to_video",
+    "name": "bfl_flux3_keyframes_to_video",
+    "label": "Bfl Flux3 Keyframes To Video",
+    "category": "Vision & Media",
+    "toolset": "bfl",
+    "description": "Read bfl_flux3_prompting_guide before your first generation. FLUX 3 keyframe video: a storyboard of 1-10 images pinned at chosen frame positions (24fps). Name the subject and describe the motion that carries it between the pins, and keep the subject consistent across every pinned image. Media fields accept a local file path (uploaded automatically ",
+    "parameters": [
+      {
+        "name": "prompt",
+        "type": "string",
+        "description": "Generation brief in plain prose (it is interpreted and expanded by a reasoning harness). Order it subject, distinguishin",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "aspect_ratio",
+        "type": "string",
+        "description": "Output aspect ratio. \"auto\" lets the model choose.",
+        "required": false,
+        "enum": [
+          "auto",
+          "21:9",
+          "16:9",
+          "4:3",
+          "1:1",
+          "3:4",
+          "9:16",
+          "9:21"
+        ]
+      },
+      {
+        "name": "duration",
+        "type": "string",
+        "description": "Clip duration in whole seconds (5-20), or \"auto\".",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "resolution",
+        "type": "string",
+        "description": "Output resolution bin.",
+        "required": false,
+        "enum": [
+          "720p"
+        ]
+      },
+      {
+        "name": "generate_audio",
+        "type": "boolean",
+        "description": "Generate synchronized audio.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "grounding",
+        "type": "boolean",
+        "description": "Allow a short research pass before generation.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "seed",
+        "type": "integer",
+        "description": "Optional reproducibility seed.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "version",
+        "type": "string",
+        "description": "Model version pin. Defaults to \"latest\".",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "input_images",
+        "type": "array",
+        "description": "1-10 keyframe images: local file paths or URLs (PNG/JPEG/WebP, up to 10MB each).",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "keyframe_indices",
+        "type": "array",
+        "description": "One unique non-negative frame index per image (24fps). Each must be at most duration\u00d724, so set an explicit duration rat",
+        "required": true,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "bfl_flux3_video_continuation",
+    "name": "bfl_flux3_video_continuation",
+    "label": "Bfl Flux3 Video Continuation",
+    "category": "Vision & Media",
+    "toolset": "bfl",
+    "description": "Read bfl_flux3_prompting_guide before your first generation. FLUX 3 video continuation: the new generation picks up from the input clip's final frames. Open the prompt with \"Continue this video from its final frames:\", re-establish the subject and the moment it ended on, then describe what happens next. input_video must be an mp4 of at most 50MB an",
+    "parameters": [
+      {
+        "name": "prompt",
+        "type": "string",
+        "description": "Generation brief in plain prose (it is interpreted and expanded by a reasoning harness). Order it subject, distinguishin",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "aspect_ratio",
+        "type": "string",
+        "description": "Output aspect ratio. \"auto\" lets the model choose.",
+        "required": false,
+        "enum": [
+          "auto",
+          "21:9",
+          "16:9",
+          "4:3",
+          "1:1",
+          "3:4",
+          "9:16",
+          "9:21"
+        ]
+      },
+      {
+        "name": "duration",
+        "type": "string",
+        "description": "Clip duration in whole seconds (5-20), or \"auto\".",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "resolution",
+        "type": "string",
+        "description": "Output resolution bin.",
+        "required": false,
+        "enum": [
+          "720p"
+        ]
+      },
+      {
+        "name": "generate_audio",
+        "type": "boolean",
+        "description": "Generate synchronized audio.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "grounding",
+        "type": "boolean",
+        "description": "Allow a short research pass before generation.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "seed",
+        "type": "integer",
+        "description": "Optional reproducibility seed.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "version",
+        "type": "string",
+        "description": "Model version pin. Defaults to \"latest\".",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "input_video",
+        "type": "string",
+        "description": "The clip to continue: a local file path or a URL. mp4 only, at most 50MB and 15 seconds.",
+        "required": true,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "bfl_flux3_get_result",
+    "name": "bfl_flux3_get_result",
+    "label": "Bfl Flux3 Get Result",
+    "category": "Vision & Media",
+    "toolset": "bfl",
+    "description": "Poll a FLUX 3 video job by the job id a generate tool returned. Generation takes minutes and a long Generating phase is normal. This call waits for you while the job runs, so it may run for several minutes; if it returns still generating, just call it again. Do not sleep between calls. On Ready the clip is downloaded for you and the response gives ",
+    "parameters": [
+      {
+        "name": "id",
+        "type": "string",
+        "description": "Job id from a previous bfl_flux3_* generate call.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "save_to",
+        "type": "string",
+        "description": "Where to save the finished clip: a directory or a full file path. Set this only when the user asked for a particular loc",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "bfl_flux3_prompting_guide",
+    "name": "bfl_flux3_prompting_guide",
+    "label": "Bfl Flux3 Prompting Guide",
+    "category": "Vision & Media",
+    "toolset": "bfl",
+    "description": "Read this before your first FLUX 3 generation. The prompting and grounding guide: how to research a subject so it renders as itself, how to assemble a prompt, which generate tool fits, and how to save and deliver the finished clip. Takes no arguments and spends no generation budget.",
+    "parameters": [],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "focus_pane",
+    "name": "focus_pane",
+    "label": "Focus Pane",
+    "category": "Terminal & Processes",
+    "toolset": "terminal",
+    "description": "Reveal and focus a pane in the Hermes desktop app when the user asks to see it \u2014 e.g. \"show me the terminal\", \"open the file browser\", \"show the diff\". Panes: chat (the conversation), files (project file browser), terminal (embedded shell), review (git diff), sessions (the session list). To show a URL or file in the preview pane, use open_preview i",
+    "parameters": [
+      {
+        "name": "pane",
+        "type": "string",
+        "description": "Which pane to reveal.",
+        "required": true,
+        "enum": [
+          "chat",
+          "files",
+          "terminal",
+          "review",
+          "sessions"
+        ]
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "ha_list_entities",
+    "name": "ha_list_entities",
+    "label": "Ha List Entities",
+    "category": "Integrations & Messaging",
+    "toolset": "homeassistant",
+    "description": "List Home Assistant entities. Optionally filter by domain (light, switch, climate, sensor, binary_sensor, cover, fan, etc.) or by area name (living room, kitchen, bedroom, etc.).",
+    "parameters": [
+      {
+        "name": "domain",
+        "type": "string",
+        "description": "Entity domain to filter by (e.g. 'light', 'switch', 'climate', 'sensor', 'binary_sensor', 'cover', 'fan', 'media_player'",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "area",
+        "type": "string",
+        "description": "Area/room name to filter by (e.g. 'living room', 'kitchen'). Matches against entity friendly names. Omit to list all.",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "ha_get_state",
+    "name": "ha_get_state",
+    "label": "Ha Get State",
+    "category": "Integrations & Messaging",
+    "toolset": "homeassistant",
+    "description": "Get the detailed state of a single Home Assistant entity, including all attributes (brightness, color, temperature setpoint, sensor readings, etc.).",
+    "parameters": [
+      {
+        "name": "entity_id",
+        "type": "string",
+        "description": "The entity ID to query (e.g. 'light.living_room', 'climate.thermostat', 'sensor.temperature').",
+        "required": true,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "ha_list_services",
+    "name": "ha_list_services",
+    "label": "Ha List Services",
+    "category": "Integrations & Messaging",
+    "toolset": "homeassistant",
+    "description": "List available Home Assistant services (actions) for device control. Shows what actions can be performed on each device type and what parameters they accept. Use this to discover how to control devices found via ha_list_entities.",
+    "parameters": [
+      {
+        "name": "domain",
+        "type": "string",
+        "description": "Filter by domain (e.g. 'light', 'climate', 'switch'). Omit to list services for all domains.",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "ha_call_service",
+    "name": "ha_call_service",
+    "label": "Ha Call Service",
+    "category": "Integrations & Messaging",
+    "toolset": "homeassistant",
+    "description": "Call a Home Assistant service to control a device. Use ha_list_services to discover available services and their parameters for each domain.",
+    "parameters": [
+      {
+        "name": "domain",
+        "type": "string",
+        "description": "Service domain (e.g. 'light', 'switch', 'climate', 'cover', 'media_player', 'fan', 'scene', 'script').",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "service",
+        "type": "string",
+        "description": "Service name (e.g. 'turn_on', 'turn_off', 'toggle', 'set_temperature', 'set_hvac_mode', 'open_cover', 'close_cover', 'se",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "entity_id",
+        "type": "string",
+        "description": "Target entity ID (e.g. 'light.living_room'). Some services (like scene.turn_on) may not need this.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "data",
+        "type": "string",
+        "description": "Additional service data as a JSON string. Examples: {\"brightness\": 255, \"color_name\": \"blue\"} for lights, {\"temperature\"",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "image_generate",
+    "name": "image_generate",
+    "label": "Image Generate",
+    "category": "Vision & Media",
+    "toolset": "image_gen",
+    "description": "Generate high-quality images from text prompts (text-to-image), or edit / transform an existing image (image-to-image) when the active model supports it. Pass `image_url` to edit that image; add `reference_image_urls` for style/composition references; omit both for text-to-image. The underlying backend (FAL, OpenAI, xAI, etc.) and model are user-co",
+    "parameters": [
+      {
+        "name": "prompt",
+        "type": "string",
+        "description": "The text prompt describing the desired image (text-to-image) or the edit to apply (image-to-image). Be detailed and desc",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "aspect_ratio",
+        "type": "string",
+        "description": "The aspect ratio of the generated image. 'landscape' is 16:9 wide, 'portrait' is 16:9 tall, 'square' is 1:1.",
+        "required": false,
+        "enum": [
+          "landscape",
+          "square",
+          "portrait"
+        ]
+      },
+      {
+        "name": "image_url",
+        "type": "string",
+        "description": "Optional source image to edit/transform (image-to-image). When provided, the active backend routes to its image editing ",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "reference_image_urls",
+        "type": "array",
+        "description": "Optional list of additional reference image URLs / paths (style, character, or composition references) to guide an image",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "kanban_show",
+    "name": "kanban_show",
+    "label": "Kanban Show",
+    "category": "Memory & Planning",
+    "toolset": "kanban",
+    "description": "Read a task's full state \u2014 title, body, assignee, parent task handoffs, your prior attempts on this task if any, comments, and recent events. Use this to (re)orient yourself before starting work, especially on retries. The response includes a pre-formatted ``worker_context`` string suitable for inclusion verbatim in your reasoning.",
+    "parameters": [
+      {
+        "name": "task_id",
+        "type": "string",
+        "description": "Task id. If omitted, defaults to HERMES_KANBAN_TASK from the env (the task the dispatcher spawned you to work on).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "board",
+        "type": "string",
+        "description": "Kanban board slug to target. When omitted, the call resolves the active board the usual way: HERMES_KANBAN_DB env \u2192 HERM",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "kanban_list",
+    "name": "kanban_list",
+    "label": "Kanban List",
+    "category": "Memory & Planning",
+    "toolset": "kanban",
+    "description": "List Kanban task summaries so an orchestrator profile can discover work to route. Supports the same core filters as the CLI: assignee, status, tenant, include_archived, and limit. Returns compact rows with ids, title, status, assignee, priority, parent/child ids, and counts. Bounded to 50 rows by default, 200 max, with truncation metadata. Also rec",
+    "parameters": [
+      {
+        "name": "assignee",
+        "type": "string",
+        "description": "Optional assignee/profile filter.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "status",
+        "type": "string",
+        "description": "Optional task status filter.",
+        "required": false,
+        "enum": [
+          "triage",
+          "todo",
+          "ready",
+          "running",
+          "blocked",
+          "done",
+          "archived"
+        ]
+      },
+      {
+        "name": "tenant",
+        "type": "string",
+        "description": "Optional tenant/project namespace filter.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "include_archived",
+        "type": "boolean",
+        "description": "Include archived tasks. Defaults to false.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "description": "Optional maximum rows to return (default 50, max 200).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "board",
+        "type": "string",
+        "description": "Kanban board slug to target. When omitted, the call resolves the active board the usual way: HERMES_KANBAN_DB env \u2192 HERM",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "kanban_complete",
+    "name": "kanban_complete",
+    "label": "Kanban Complete",
+    "category": "Memory & Planning",
+    "toolset": "kanban",
+    "description": "Mark your current task done with a structured handoff for downstream workers and humans. Prefer ``summary`` for a human-readable 1-3 sentence description of what you did; put machine-readable facts in ``metadata`` (changed_files, tests_run, decisions, findings, etc). At least one of ``summary`` or ``result`` is required. If you created new tasks vi",
+    "parameters": [
+      {
+        "name": "task_id",
+        "type": "string",
+        "description": "Task id. If omitted, defaults to HERMES_KANBAN_TASK from the env (the task the dispatcher spawned you to work on).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "summary",
+        "type": "string",
+        "description": "Human-readable handoff, 1-3 sentences. Appears in Run History on the dashboard and in downstream workers' context.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "metadata",
+        "type": "object",
+        "description": "Free-form dict of structured facts about this attempt \u2014 {\"changed_files\": [...], \"tests_run\": 12, \"findings\": [...]}. Su",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "result",
+        "type": "string",
+        "description": "Short result log line (legacy field, maps to task.result). Use ``summary`` instead when possible; this exists for compat",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "created_cards",
+        "type": "array",
+        "description": "Optional structured manifest of task ids you created via ``kanban_create`` during this run. The kernel verifies each id ",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "artifacts",
+        "type": "array",
+        "description": "Optional list of absolute paths to deliverable files you produced during this run \u2014 generated charts, PDFs, spreadsheets",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "board",
+        "type": "string",
+        "description": "Kanban board slug to target. When omitted, the call resolves the active board the usual way: HERMES_KANBAN_DB env \u2192 HERM",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "kanban_block",
+    "name": "kanban_block",
+    "label": "Kanban Block",
+    "category": "Memory & Planning",
+    "toolset": "kanban",
+    "description": "Stop work on this task and route it according to WHY you're stuck. Set ``kind`` to say which: 'dependency' (waiting on another task \u2014 goes to todo and auto-resumes when that task finishes, no human needed), 'needs_input' (you need a human decision/answer), 'capability' (a hard wall: no access, missing credentials, an action no agent can do), or 'tr",
+    "parameters": [
+      {
+        "name": "task_id",
+        "type": "string",
+        "description": "Task id. If omitted, defaults to HERMES_KANBAN_TASK from the env (the task the dispatcher spawned you to work on).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "reason",
+        "type": "string",
+        "description": "What you need answered or what stopped you, in one or two sentences. Don't paste the whole conversation; the human has t",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "kind",
+        "type": "string",
+        "description": "Why you're blocked. 'dependency' waits in todo and resumes automatically; the others surface to a human. Omit only if no",
+        "required": false,
+        "enum": [
+          "dependency",
+          "needs_input",
+          "capability",
+          "transient"
+        ]
+      },
+      {
+        "name": "board",
+        "type": "string",
+        "description": "Kanban board slug to target. When omitted, the call resolves the active board the usual way: HERMES_KANBAN_DB env \u2192 HERM",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "kanban_heartbeat",
+    "name": "kanban_heartbeat",
+    "label": "Kanban Heartbeat",
+    "category": "Memory & Planning",
+    "toolset": "kanban",
+    "description": "Signal that you're still alive during a long operation (training, encoding, large crawls). Call every few minutes so humans see liveness separately from PID checks. Pure side effect \u2014 no work changes.",
+    "parameters": [
+      {
+        "name": "task_id",
+        "type": "string",
+        "description": "Task id. If omitted, defaults to HERMES_KANBAN_TASK from the env (the task the dispatcher spawned you to work on).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "note",
+        "type": "string",
+        "description": "Optional short note describing current progress. Shown in the event log.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "board",
+        "type": "string",
+        "description": "Kanban board slug to target. When omitted, the call resolves the active board the usual way: HERMES_KANBAN_DB env \u2192 HERM",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "kanban_comment",
+    "name": "kanban_comment",
+    "label": "Kanban Comment",
+    "category": "Memory & Planning",
+    "toolset": "kanban",
+    "description": "Append a comment to a task's thread. Use for durable notes that should outlive this run (questions for the next worker, partial findings, rationale). Ephemeral reasoning doesn't belong here \u2014 use your normal response instead.",
+    "parameters": [
+      {
+        "name": "task_id",
+        "type": "string",
+        "description": "Task id. Required (may be your own task or another's \u2014 comment threads are per-task).",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "body",
+        "type": "string",
+        "description": "Markdown-supported comment body.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "board",
+        "type": "string",
+        "description": "Kanban board slug to target. When omitted, the call resolves the active board the usual way: HERMES_KANBAN_DB env \u2192 HERM",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "kanban_attach",
+    "name": "kanban_attach",
+    "label": "Kanban Attach",
+    "category": "Memory & Planning",
+    "toolset": "kanban",
+    "description": "Attach a file to a task by passing its bytes inline (base64). Use for genuine file artifacts the next worker or a human should be able to download \u2014 generated reports, images, exports. The file is stored as a real attachment (not a comment link) under the task's attachments dir, capped at 25 MB. Prefer kanban_attach_url when you only have a URL.",
+    "parameters": [
+      {
+        "name": "task_id",
+        "type": "string",
+        "description": "Task id. If omitted, defaults to HERMES_KANBAN_TASK from the env (the task the dispatcher spawned you to work on).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "filename",
+        "type": "string",
+        "description": "File name to store it under (e.g. 'report.pdf'). Directory components are stripped; only the leaf is kept.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "content_base64",
+        "type": "string",
+        "description": "The file contents, base64-encoded. Max 25 MB decoded.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "content_type",
+        "type": "string",
+        "description": "Optional MIME type (e.g. 'application/pdf').",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "board",
+        "type": "string",
+        "description": "Kanban board slug to target. When omitted, the call resolves the active board the usual way: HERMES_KANBAN_DB env \u2192 HERM",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "kanban_attach_url",
+    "name": "kanban_attach_url",
+    "label": "Kanban Attach Url",
+    "category": "Memory & Planning",
+    "toolset": "kanban",
+    "description": "Attach a file to a task by URL \u2014 Hermes downloads it server-side and stores it as a real attachment (capped at 25 MB). Use when you have a link rather than the bytes. Only http/https URLs are accepted.",
+    "parameters": [
+      {
+        "name": "task_id",
+        "type": "string",
+        "description": "Task id. If omitted, defaults to HERMES_KANBAN_TASK from the env (the task the dispatcher spawned you to work on).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "url",
+        "type": "string",
+        "description": "http(s) URL to fetch and store.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "filename",
+        "type": "string",
+        "description": "Optional name to store it under. Defaults to the URL path's leaf component.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "content_type",
+        "type": "string",
+        "description": "Optional MIME type override. Defaults to the Content-Type the server returns.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "board",
+        "type": "string",
+        "description": "Kanban board slug to target. When omitted, the call resolves the active board the usual way: HERMES_KANBAN_DB env \u2192 HERM",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "kanban_attachments",
+    "name": "kanban_attachments",
+    "label": "Kanban Attachments",
+    "category": "Memory & Planning",
+    "toolset": "kanban",
+    "description": "List the files attached to a task: id, filename, content_type, size, who uploaded it, and the absolute on-disk path you can read.",
+    "parameters": [
+      {
+        "name": "task_id",
+        "type": "string",
+        "description": "Task id. If omitted, defaults to HERMES_KANBAN_TASK from the env (the task the dispatcher spawned you to work on).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "board",
+        "type": "string",
+        "description": "Kanban board slug to target. When omitted, the call resolves the active board the usual way: HERMES_KANBAN_DB env \u2192 HERM",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "kanban_create",
+    "name": "kanban_create",
+    "label": "Kanban Create",
+    "category": "Memory & Planning",
+    "toolset": "kanban",
+    "description": "Create a new kanban task, optionally as a child of the current one (pass the current task id in ``parents``). Used by orchestrator workers to fan out \u2014 decompose work into child tasks with specific assignees, link them into a pipeline, then complete your own task. The dispatcher picks up the new tasks on its next tick and spawns the assigned profil",
+    "parameters": [
+      {
+        "name": "title",
+        "type": "string",
+        "description": "Short task title (required).",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "assignee",
+        "type": "string",
+        "description": "Profile name that should execute this task (e.g. 'researcher-a', 'reviewer', 'writer'). Required \u2014 tasks without an assi",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "body",
+        "type": "string",
+        "description": "Opening post: full spec, acceptance criteria, links. The assigned worker reads this as part of its context.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "parents",
+        "type": "array",
+        "description": "Parent task ids. The new task stays in 'todo' until every parent reaches 'done'; then it auto-promotes to 'ready'. Typic",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "tenant",
+        "type": "string",
+        "description": "Optional namespace for multi-project isolation. Defaults to HERMES_TENANT env if set.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "priority",
+        "type": "integer",
+        "description": "Dispatcher tiebreaker. Higher = picked sooner when multiple ready tasks share an assignee.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "workspace_kind",
+        "type": "string",
+        "description": "Workspace flavor: 'scratch' (fresh tmp dir, default), 'dir' (shared directory, requires absolute workspace_path), 'workt",
+        "required": false,
+        "enum": [
+          "scratch",
+          "dir",
+          "worktree"
+        ]
+      },
+      {
+        "name": "workspace_path",
+        "type": "string",
+        "description": "Absolute path for 'dir' or 'worktree' workspace. Relative paths are rejected at dispatch.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "project",
+        "type": "string",
+        "description": "Optional project id or slug to link the task to. When set, the task becomes a git worktree under the project's primary r",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "triage",
+        "type": "boolean",
+        "description": "If true, task lands in 'triage' instead of 'todo' \u2014 a specifier profile is expected to flesh out the body before work st",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "idempotency_key",
+        "type": "string",
+        "description": "If a non-archived task with this key already exists, return that task's id instead of creating a duplicate. Useful for r",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "max_runtime_seconds",
+        "type": "integer",
+        "description": "Per-task runtime cap. When exceeded, the dispatcher SIGTERMs the worker and re-queues the task with outcome='timed_out'.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "initial_status",
+        "type": "string",
+        "description": "Initial card status. Use 'blocked' for tasks that require immediate human ops (R3 gate) to skip the brief running-to-blo",
+        "required": false,
+        "enum": [
+          "running",
+          "blocked"
+        ]
+      },
+      {
+        "name": "skills",
+        "type": "array",
+        "description": "Skill names to force-load into the dispatched worker. The kanban lifecycle is already injected automatically; use this t",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "goal_mode",
+        "type": "boolean",
+        "description": "Run the dispatched worker in a goal loop. When true, after each turn an auxiliary judge checks the worker's response aga",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "goal_max_turns",
+        "type": "integer",
+        "description": "Turn budget for goal_mode workers. Caps how many continuation turns the worker may take before the task is blocked for r",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "model",
+        "type": "string",
+        "description": "Pin the dispatched worker to this model instead of the assignee profile's configured model. Use the exact model name the",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "provider",
+        "type": "string",
+        "description": "Provider the 'model' belongs to (e.g. 'openrouter', 'anthropic', 'nous'). Set this whenever the model is not from the as",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "board",
+        "type": "string",
+        "description": "Kanban board slug to target. When omitted, the call resolves the active board the usual way: HERMES_KANBAN_DB env \u2192 HERM",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "kanban_unblock",
+    "name": "kanban_unblock",
+    "label": "Kanban Unblock",
+    "category": "Memory & Planning",
+    "toolset": "kanban",
+    "description": "Unblock a Kanban task. It moves to ready when all parents are done, or todo while any parent remains open. Orchestrator-only \u2014 only profiles with the kanban toolset can unblock routed work; dispatcher-spawned task workers never see this tool.",
+    "parameters": [
+      {
+        "name": "task_id",
+        "type": "string",
+        "description": "Blocked task id to move to ready or parent-gated todo.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "board",
+        "type": "string",
+        "description": "Kanban board slug to target. When omitted, the call resolves the active board the usual way: HERMES_KANBAN_DB env \u2192 HERM",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "kanban_link",
+    "name": "kanban_link",
+    "label": "Kanban Link",
+    "category": "Memory & Planning",
+    "toolset": "kanban",
+    "description": "Add a parent\u2192child dependency edge after both tasks already exist. The child won't promote to 'ready' until all parents are 'done'. Cycles and self-links are rejected.",
+    "parameters": [
+      {
+        "name": "parent_id",
+        "type": "string",
+        "description": "Parent task id.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "child_id",
+        "type": "string",
+        "description": "Child task id.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "board",
+        "type": "string",
+        "description": "Kanban board slug to target. When omitted, the call resolves the active board the usual way: HERMES_KANBAN_DB env \u2192 HERM",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "memory",
+    "name": "memory",
+    "label": "Memory",
+    "category": "Memory & Planning",
+    "toolset": "memory",
+    "description": "Save durable facts to persistent memory that survive across sessions. Memory is injected into every future turn, so keep entries compact and high-signal.\n\nHOW: make ALL your changes in ONE call via an 'operations' array (each item: {action, content?, old_text?}). The batch applies atomically and the char limit is checked only on the FINAL result \u2014 ",
+    "parameters": [
+      {
+        "name": "action",
+        "type": "string",
+        "description": "The action to perform (single-op shape). Omit when using 'operations'.",
+        "required": false,
+        "enum": [
+          "add",
+          "replace",
+          "remove"
+        ]
+      },
+      {
+        "name": "target",
+        "type": "string",
+        "description": "Which memory store: 'memory' for personal notes, 'user' for user profile.",
+        "required": true,
+        "enum": [
+          "memory",
+          "user"
+        ]
+      },
+      {
+        "name": "content",
+        "type": "string",
+        "description": "The entry content. Required for 'add' and 'replace' (single-op shape).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "old_text",
+        "type": "string",
+        "description": "REQUIRED for 'replace' and 'remove' (single-op shape): a short unique substring identifying the existing entry to modify",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "operations",
+        "type": "array",
+        "description": "Batch shape: a list of operations applied atomically in one call against the final char budget. Preferred when making mu",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "open_preview",
+    "name": "open_preview",
+    "label": "Open Preview",
+    "category": "Integrations & Messaging",
+    "toolset": "terminal",
+    "description": "Open something in the preview pane beside the chat in the Hermes desktop app. Use this when the user asks to see a page, dev server, or file in the preview pane \u2014 e.g. \"open cnn.com in the preview pane\" or \"preview localhost:3000\". Accepts a web URL (a bare domain like www.cnn.com is fine), a localhost dev-server URL, or a file path (HTML renders l",
+    "parameters": [
+      {
+        "name": "url",
+        "type": "string",
+        "description": "What to preview: a web URL (https://\u2026 or a bare domain), a localhost URL (localhost:3000), or a file path.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "label",
+        "type": "string",
+        "description": "Optional tab label; defaults to the target's name.",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "project_list",
+    "name": "project_list",
+    "label": "Project List",
+    "category": "Code Execution",
+    "toolset": "project",
+    "description": "List the desktop Projects (named workspaces) and which one is active.",
+    "parameters": [],
+    "enabled": false,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "project_create",
+    "name": "project_create",
+    "label": "Project Create",
+    "category": "Code Execution",
+    "toolset": "project",
+    "description": "Create a desktop Project (a named workspace) and switch this chat into it. Pass `path` to anchor it to a repo/folder \u2014 this chat's workspace moves there and the sidebar follows. Use when starting work in a new repo/folder; this is the intentional way to move the session, not `cd`.",
+    "parameters": [
+      {
+        "name": "name",
+        "type": "string",
+        "description": "Human name, e.g. 'Aurora Demo'",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "path",
+        "type": "string",
+        "description": "Primary repo/folder to anchor the project to",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "project_switch",
+    "name": "project_switch",
+    "label": "Project Switch",
+    "category": "Code Execution",
+    "toolset": "project",
+    "description": "Switch this chat into an existing desktop Project (by name, slug, or id). Moves the session's workspace to the project's primary folder and the sidebar follows. The intentional way to move between projects, not `cd`.",
+    "parameters": [
+      {
+        "name": "project",
+        "type": "string",
+        "description": "Project name, slug, or id",
+        "required": true,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "react_to_message",
+    "name": "react_to_message",
+    "label": "React To Message",
+    "category": "Integrations & Messaging",
+    "toolset": "terminal",
+    "description": "React to a message with a single emoji, the way you'd tapback in iMessage. Reach for it when a reaction is what a person would do: something funny gets a \ud83d\ude02, warmth gets a \u2764\ufe0f, a plan you're on board with gets a \ud83d\udc4d \u2014 then just carry on with whatever the message actually needs. If a reaction says it all, it can BE the reply (skip the redundant 'sounds ",
+    "parameters": [
+      {
+        "name": "emoji",
+        "type": "string",
+        "description": "The emoji to react with (e.g. '\u2764\ufe0f', '\ud83d\ude02', '\ud83d\udc4d'). Pass an empty string to remove your reaction.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "message_row_id",
+        "type": "integer",
+        "description": "Optional. The specific message to react to. Omit to react to the user's latest message, which is almost always what you ",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "messages_back",
+        "type": "integer",
+        "description": "Optional. React to an EARLIER user message: 1 = the one before the latest, 2 = two before, and so on. For when something",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "read_terminal",
+    "name": "read_terminal",
+    "label": "Read Terminal",
+    "category": "Terminal & Processes",
+    "toolset": "terminal",
+    "description": "Read what's currently shown in the in-app terminal pane of the Hermes desktop GUI (the embedded shell beside this chat). Call with no arguments to get the visible screen plus the total line count (`total_lines`). To page through scrollback, pass `start_line` (0 = oldest line) and `count`; valid lines are [0, total_lines). Returns JSON: {total_lines",
+    "parameters": [
+      {
+        "name": "start_line",
+        "type": "integer",
+        "description": "0-indexed first line (0 = oldest). Omit for the visible screen.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "count",
+        "type": "integer",
+        "description": "Lines to read from start_line. Defaults to the visible row count.",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "session_search",
+    "name": "session_search",
+    "label": "Session Search",
+    "category": "Memory & Planning",
+    "toolset": "session_search",
+    "description": "Search past sessions stored in the local session DB, or scroll inside one. FTS5-backed retrieval over the SQLite message store. No LLM calls \u2014 every shape returns actual messages from the DB.\n\nSOURCE-FIRST LIMIT\n\n  This tool searches Hermes conversation history only. It is not evidence about the current contents of external sources. If the user pro",
+    "parameters": [
+      {
+        "name": "query",
+        "type": "string",
+        "description": "Search query (discovery shape). Keywords, phrases, or boolean expressions to find in past sessions. Omit to browse recen",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "description": "Discovery shape only. Max sessions to return (default 3, max 10). Bump to 5\u201310 when the topic likely spans several sessi",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "sort",
+        "type": "string",
+        "description": "Discovery shape only. Temporal bias on top of FTS5 ranking. Omit to keep relevance-only ordering (suitable for explorato",
+        "required": false,
+        "enum": [
+          "newest",
+          "oldest"
+        ]
+      },
+      {
+        "name": "session_id",
+        "type": "string",
+        "description": "Scroll shape. Session to read inside. Use the session_id returned from a prior discovery call. Must be paired with aroun",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "around_message_id",
+        "type": "integer",
+        "description": "Scroll shape. Message id to center the window on. From a discovery result use match_message_id, or any id seen in a prio",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "window",
+        "type": "integer",
+        "description": "Scroll shape only. Messages to return on each side of the anchor (anchor itself always included). Clamped to [1, 20]. De",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "role_filter",
+        "type": "string",
+        "description": "Optional. Comma-separated roles to include. Discovery defaults to 'user,assistant' (tool output is usually noise). Pass ",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "profile",
+        "type": "string",
+        "description": "Optional. Read sessions from another Hermes profile's database (read-only). Use when resolving an `@session:<profile>/<i",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "skill_manage",
+    "name": "skill_manage",
+    "label": "Skill Manage",
+    "category": "Integrations & Messaging",
+    "toolset": "skills",
+    "description": "Manage skills (create, update, delete). Skills are your procedural memory \u2014 reusable approaches for recurring task types. New skills go to ~/AppData\\Local\\hermes/skills/; existing skills can be modified wherever they live.\n\nActions: create (full SKILL.md + optional category), patch (old_string/new_string \u2014 preferred for fixes), edit (full SKILL.md ",
+    "parameters": [
+      {
+        "name": "action",
+        "type": "string",
+        "description": "The action to perform.",
+        "required": true,
+        "enum": [
+          "create",
+          "patch",
+          "edit",
+          "delete",
+          "write_file",
+          "remove_file"
+        ]
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "description": "Skill name (lowercase, hyphens/underscores, max 64 chars). Must match an existing skill for patch/edit/delete/write_file",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "content",
+        "type": "string",
+        "description": "Full SKILL.md content (YAML frontmatter + markdown body). Required for 'create' and 'edit'. For 'edit', read the skill f",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "old_string",
+        "type": "string",
+        "description": "Text to find in the file (required for 'patch'). Must be unique unless replace_all=true. Include enough surrounding cont",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "new_string",
+        "type": "string",
+        "description": "Replacement text (required for 'patch'). Can be empty string to delete the matched text.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "replace_all",
+        "type": "boolean",
+        "description": "For 'patch': replace all occurrences instead of requiring a unique match (default: false).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "category",
+        "type": "string",
+        "description": "Optional category/domain for organizing the skill (e.g., 'devops', 'data-science', 'mlops'). Creates a subdirectory grou",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "file_path",
+        "type": "string",
+        "description": "Path to a supporting file within the skill directory. For 'write_file'/'remove_file': required, must be under references",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "file_content",
+        "type": "string",
+        "description": "Content for the file. Required for 'write_file'.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "absorbed_into",
+        "type": "string",
+        "description": "For 'delete' only \u2014 declares intent so the curator can tell consolidation from pruning without guessing. Pass the umbrel",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "skills_list",
+    "name": "skills_list",
+    "label": "Skills List",
+    "category": "Integrations & Messaging",
+    "toolset": "skills",
+    "description": "List available skills (name + description). Use skill_view(name) to load full content.",
+    "parameters": [
+      {
+        "name": "category",
+        "type": "string",
+        "description": "Optional category filter to narrow results",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "skill_view",
+    "name": "skill_view",
+    "label": "Skill View",
+    "category": "Integrations & Messaging",
+    "toolset": "skills",
+    "description": "Skills allow for loading information about specific tasks and workflows, as well as scripts and templates. Load a skill's full content or access its linked files (references, templates, scripts). First call returns SKILL.md content plus a 'linked_files' dict showing available references/templates/scripts. To access those, call again with file_path ",
+    "parameters": [
+      {
+        "name": "name",
+        "type": "string",
+        "description": "The skill name (use skills_list to see available skills). For plugin-provided skills, use the qualified form 'plugin:ski",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "file_path",
+        "type": "string",
+        "description": "OPTIONAL: Path to a linked file within the skill (e.g., 'references/api.md', 'templates/config.yaml', 'scripts/validate.",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "todo",
+    "name": "todo",
+    "label": "Todo",
+    "category": "Memory & Planning",
+    "toolset": "todo",
+    "description": "Manage your task list for the current session. Use for complex tasks with 3+ steps or when the user provides multiple tasks. Call with no parameters to read the current list.\n\nWriting:\n- Provide 'todos' array to create/update items\n- merge=false (default): replace the entire list with a fresh plan\n- merge=true: update existing items by id, add any ",
+    "parameters": [
+      {
+        "name": "todos",
+        "type": "array",
+        "description": "Task items to write. Omit to read current list.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "merge",
+        "type": "boolean",
+        "description": "true: update existing items by id, add new ones. false (default): replace the entire list.",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "text_to_speech",
+    "name": "text_to_speech",
+    "label": "Text To Speech",
+    "category": "Voice & Audio",
+    "toolset": "tts",
+    "description": "Convert text to speech audio. Returns a MEDIA: path that the platform delivers as native audio. Compatible providers render as a voice bubble on Telegram; otherwise audio is sent as a regular attachment. In CLI mode, saves to ~/voice-memos/. Voice and provider are user-configured (built-in providers like edge/openai or custom command providers unde",
+    "parameters": [
+      {
+        "name": "text",
+        "type": "string",
+        "description": "The text to convert to speech. Provider-specific character caps apply and are enforced automatically (OpenAI 4096, xAI 1",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "output_path",
+        "type": "string",
+        "description": "Optional custom file path to save the audio. Defaults to ~/AppData\\Local\\hermes/audio_cache/<timestamp>.mp3",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "speed",
+        "type": "number",
+        "description": "Playback speed multiplier. 1.0 = normal, 0.5 = very slow (language learning), 2.0 = fast. Range: 0.25-4.0. Overrides the",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "instructions",
+        "type": "string",
+        "description": "Optional voice-design guidance: tone, emotion, pacing, accent, whispering, impressions (e.g. 'Speak in a cheerful, excit",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "provider",
+        "type": "string",
+        "description": "Optional TTS provider override. Accepts built-in names (edge, openai, elevenlabs, minimax, xai, mistral, gemini, neutts,",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": true,
+    "requirementHint": null
+  },
+  {
+    "id": "video_generate",
+    "name": "video_generate",
+    "label": "Video Generate",
+    "category": "Vision & Media",
+    "toolset": "video_gen",
+    "description": "(rebuilt at get_definitions() time \u2014 see _build_dynamic_video_schema)",
+    "parameters": [
+      {
+        "name": "prompt",
+        "type": "string",
+        "description": "Text instruction describing the desired video, motion, subject, style, camera movement, etc.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "image_url",
+        "type": "string",
+        "description": "Optional public HTTPS URL of a still image. When provided, the active backend routes to its image-to-video endpoint (ani",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "reference_image_urls",
+        "type": "array",
+        "description": "Optional list of public HTTPS reference image URLs (style or character refs). For xAI chaining, use `image` or `public_u",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "duration",
+        "type": "integer",
+        "description": "Desired video duration in seconds. Providers clamp to their supported range (commonly 4-15s). Omit to use the provider's",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "aspect_ratio",
+        "type": "string",
+        "description": "Output aspect ratio. Providers clamp to their supported set.",
+        "required": false,
+        "enum": [
+          "16:9",
+          "9:16",
+          "1:1",
+          "4:3",
+          "3:4",
+          "3:2",
+          "2:3"
+        ]
+      },
+      {
+        "name": "resolution",
+        "type": "string",
+        "description": "Output resolution. Providers clamp to their supported set.",
+        "required": false,
+        "enum": [
+          "480p",
+          "540p",
+          "720p",
+          "1080p"
+        ]
+      },
+      {
+        "name": "negative_prompt",
+        "type": "string",
+        "description": "Optional negative prompt \u2014 content to avoid in the output. Supported by Pixverse, Kling, and similar; ignored by provide",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "audio",
+        "type": "boolean",
+        "description": "Optional audio generation toggle. Supported by Veo3 and Pixverse (affects pricing tier); ignored elsewhere.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "seed",
+        "type": "integer",
+        "description": "Optional seed for reproducible outputs (provider-dependent).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "model",
+        "type": "string",
+        "description": "Optional model override. If omitted, the user's configured ``video_gen.model`` (set via `hermes tools` \u2192 Video Generatio",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "vision_analyze",
+    "name": "vision_analyze",
+    "label": "Vision Analyze",
+    "category": "Vision & Media",
+    "toolset": "vision",
+    "description": "Load an image into the conversation so you can see it. Accepts a URL, local file path, or data URL. When your active model has native vision, the image is attached to your context directly and you read the pixels yourself on the next turn \u2014 call this any time the user references an image (filepath in their message, URL in tool output, screenshot fr",
+    "parameters": [
+      {
+        "name": "image_url",
+        "type": "string",
+        "description": "Image URL (http/https), local file path, or data: URL to load.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "question",
+        "type": "string",
+        "description": "Your specific question or request about the image. Optional context the model uses on the next turn after seeing the ima",
+        "required": true,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "video_analyze",
+    "name": "video_analyze",
+    "label": "Video Analyze",
+    "category": "Vision & Media",
+    "toolset": "video",
+    "description": "Analyze a video from a URL or local file path using a multimodal AI model. Sends the video to a video-capable model (e.g. Gemini) for understanding. Use this for video files \u2014 for images, use vision_analyze instead. Supports mp4, webm, mov, avi, mkv, mpeg formats. Note: large videos (>20 MB) may be slow; max ~50 MB.",
+    "parameters": [
+      {
+        "name": "video_url",
+        "type": "string",
+        "description": "Video URL (http/https) or local file path to analyze.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "question",
+        "type": "string",
+        "description": "Your specific question about the video. The AI will describe what happens in the video and answer your question.",
+        "required": true,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "web_search",
+    "name": "web_search",
+    "label": "Web Search",
+    "category": "Web & Search",
+    "toolset": "web",
+    "description": "Search the web for information. Returns up to 5 results by default with titles, URLs, and descriptions. The query is passed through to the configured backend, so operators such as site:domain, filetype:pdf, intitle:word, -term, and \"exact phrase\" may work when the backend supports them.",
+    "parameters": [
+      {
+        "name": "query",
+        "type": "string",
+        "description": "The search query to look up on the web. You may include backend-supported operators such as site:example.com, filetype:p",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "description": "Maximum number of results to return. Defaults to 5.",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "web_extract",
+    "name": "web_extract",
+    "label": "Web Extract",
+    "category": "Web & Search",
+    "toolset": "web",
+    "description": "Extract content from web page URLs. Returns clean page content in markdown/text (no LLM summarization \u2014 fast). Also works with PDF URLs (arxiv papers, documents) \u2014 pass the PDF link directly. Pages within the char budget (default 15000) return whole; larger pages return a head+tail window with a footer telling you the full text's saved file path an",
+    "parameters": [
+      {
+        "name": "urls",
+        "type": "array",
+        "description": "List of URLs to extract content from (max 5 URLs per call)",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "char_limit",
+        "type": "integer",
+        "description": "Optional per-page character budget sent back (default 15000). Pages larger than this are head+tail truncated with the fu",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": true,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "x_search",
+    "name": "x_search",
+    "label": "X Search",
+    "category": "Web & Search",
+    "toolset": "x_search",
+    "description": "Search X (Twitter) posts, profiles, and threads using xAI's built-in X Search tool. Read-only discovery only: use this for current discussion, reactions, or claims on public X rather than general web pages. Do not use it to post, reply, like, DM, upload media, delete, or inspect the user's authenticated X account \u2014 those require a separate authenti",
+    "parameters": [
+      {
+        "name": "query",
+        "type": "string",
+        "description": "What to look up on X.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "allowed_x_handles",
+        "type": "array",
+        "description": "Optional list of X handles to include exclusively (max 10).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "excluded_x_handles",
+        "type": "array",
+        "description": "Optional list of X handles to exclude (max 10).",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "from_date",
+        "type": "string",
+        "description": "Optional start date in YYYY-MM-DD format.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "to_date",
+        "type": "string",
+        "description": "Optional end date in YYYY-MM-DD format.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "enable_image_understanding",
+        "type": "boolean",
+        "description": "Whether xAI should analyze images attached to matching X posts.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "enable_video_understanding",
+        "type": "boolean",
+        "description": "Whether xAI should analyze videos attached to matching X posts.",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "xai_video_edit",
+    "name": "xai_video_edit",
+    "label": "Xai Video Edit",
+    "category": "Vision & Media",
+    "toolset": "video_gen",
+    "description": "Edit an existing video with xAI Imagine. This is separate from `video_generate` because video editing is provider-specific. `video_url` must be the public HTTPS MP4 URL from a prior Imagine result (`video` or `public_url` on files-cdn).",
+    "parameters": [
+      {
+        "name": "prompt",
+        "type": "string",
+        "description": "Instruction for how xAI should modify the source video.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "video_url",
+        "type": "string",
+        "description": "Public HTTPS MP4 URL of the source video \u2014 the `video` or `public_url` from a prior xAI Imagine result.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "model",
+        "type": "string",
+        "description": "Optional xAI Imagine model override.",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "xai_video_extend",
+    "name": "xai_video_extend",
+    "label": "Xai Video Extend",
+    "category": "Vision & Media",
+    "toolset": "video_gen",
+    "description": "Extend an existing video with xAI Imagine. This is separate from `video_generate` because video extension is provider-specific. `video_url` must be the public HTTPS MP4 URL from a prior Imagine result (`video` or `public_url` on files-cdn).",
+    "parameters": [
+      {
+        "name": "prompt",
+        "type": "string",
+        "description": "Instruction for how xAI should continue the source video.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "video_url",
+        "type": "string",
+        "description": "Public HTTPS MP4 URL of the source video \u2014 the `video` or `public_url` from a prior xAI Imagine result.",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "duration",
+        "type": "integer",
+        "description": "Desired extension duration in seconds. xAI clamps this to its supported range.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "model",
+        "type": "string",
+        "description": "Optional xAI Imagine model override.",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "yb_query_group_info",
+    "name": "yb_query_group_info",
+    "label": "Yb Query Group Info",
+    "category": "Integrations & Messaging",
+    "toolset": "hermes-yuanbao",
+    "description": "Query basic info about a group (called '\u6d3e/Pai' in the app), including group name, owner, and member count.",
+    "parameters": [
+      {
+        "name": "group_code",
+        "type": "string",
+        "description": "The unique group identifier (group_code).",
+        "required": true,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "yb_query_group_members",
+    "name": "yb_query_group_members",
+    "label": "Yb Query Group Members",
+    "category": "Integrations & Messaging",
+    "toolset": "hermes-yuanbao",
+    "description": "Query members of a group (called '\u6d3e/Pai' in the app). Use this tool when you need to @mention someone, find a user by name, list bots (including Yuanbao AI), or list all members. IMPORTANT: You MUST call this tool before @mentioning any user, because you need the exact nickname to construct the @mention format.",
+    "parameters": [
+      {
+        "name": "group_code",
+        "type": "string",
+        "description": "The unique group identifier (group_code).",
+        "required": true,
+        "enum": null
+      },
+      {
+        "name": "action",
+        "type": "string",
+        "description": "find \u2014 search a user by name (use when you need to @mention or look up someone); list_bots \u2014 list bots and Yuanbao AI as",
+        "required": true,
+        "enum": [
+          "find",
+          "list_bots",
+          "list_all"
+        ]
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "description": "User name to search (partial match, case-insensitive). Required for 'find'. Use the name the user mentioned in the conve",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "mention",
+        "type": "boolean",
+        "description": "Set to true when you need to @mention/at someone in your reply. The response will include the exact @mention format to u",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "yb_send_dm",
+    "name": "yb_send_dm",
+    "label": "Yb Send Dm",
+    "category": "Integrations & Messaging",
+    "toolset": "hermes-yuanbao",
+    "description": "Send a private/direct message (DM) to a user in a group, with optional media files. This tool automatically looks up the user by name in the group member list and sends the message. Use this when someone asks to privately message / \u79c1\u4fe1 / DM a user. Supports text, images, and file attachments. You can also provide user_id directly if already known.",
+    "parameters": [
+      {
+        "name": "group_code",
+        "type": "string",
+        "description": "The group where the target user belongs. Extract from chat_id: 'group:328306697' \u2192 '328306697'. Required when user_id is",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "description": "Target user's display name (partial match, case-insensitive). Required when user_id is not provided.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "message",
+        "type": "string",
+        "description": "The message text to send as a DM. Can be empty if only sending media.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "user_id",
+        "type": "string",
+        "description": "Target user's account ID. If provided, skips the member lookup. Usually obtained from a previous yb_query_group_members ",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "media_files",
+        "type": "array",
+        "description": "Optional list of media files to send along with the DM. Images (.jpg/.png/.gif/.webp/.bmp) are sent as image messages; o",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "yb_search_sticker",
+    "name": "yb_search_sticker",
+    "label": "Yb Search Sticker",
+    "category": "Integrations & Messaging",
+    "toolset": "hermes-yuanbao",
+    "description": "Search the built-in Yuanbao sticker (TIM face / \u8868\u60c5\u5305) catalogue by keyword. Returns the top matching candidates with sticker_id, name, and description. Use this BEFORE yb_send_sticker to discover the right sticker_id. Sticker = \u8d34\u7eb8 = TIM face \u2014 NOT a message reaction. Prefer sending a sticker over bare Unicode emoji when reacting/expressing emotion.",
+    "parameters": [
+      {
+        "name": "query",
+        "type": "string",
+        "description": "Search keyword (Chinese or English, e.g. '666', '\u6bd4\u5fc3', 'cool', '\u5403\u74dc'). Empty string returns the first N stickers.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "limit",
+        "type": "integer",
+        "description": "Max number of candidates to return (default 10, max 50).",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  },
+  {
+    "id": "yb_send_sticker",
+    "name": "yb_send_sticker",
+    "label": "Yb Send Sticker",
+    "category": "Integrations & Messaging",
+    "toolset": "hermes-yuanbao",
+    "description": "Send a built-in sticker (TIMFaceElem / \u8d34\u7eb8\u8868\u60c5) to the current Yuanbao chat. Call yb_search_sticker first if you don't know the sticker_id/name. Sticker = \u8d34\u7eb8 = TIM face \u2014 NOT a message reaction. CRITICAL: Whenever the user asks you to send a sticker / \u8d34\u7eb8 / \u8868\u60c5\u5305, you MUST use this tool. DO NOT draw a PNG via execute_code / Pillow / matplotlib and then c",
+    "parameters": [
+      {
+        "name": "sticker",
+        "type": "string",
+        "description": "Sticker name (e.g. '\u516d\u516d\u516d', '\u6bd4\u5fc3', 'ok') or numeric sticker_id (e.g. '278'). Empty string sends a random built-in sticker.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "chat_id",
+        "type": "string",
+        "description": "Target chat. Defaults to the current session. Format: 'direct:{account_id}', 'group:{group_code}', or bare account_id.",
+        "required": false,
+        "enum": null
+      },
+      {
+        "name": "reply_to",
+        "type": "string",
+        "description": "Optional ref_msg_id to quote-reply (group chat only).",
+        "required": false,
+        "enum": null
+      }
+    ],
+    "enabled": false,
+    "available": false,
+    "requirementHint": null
+  }
+]

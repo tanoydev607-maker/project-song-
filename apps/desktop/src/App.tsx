@@ -38,6 +38,11 @@ import {
   MicOff,
   Waves,
   AudioLines,
+  MousePointer2,
+  Monitor,
+  Target,
+  Wrench,
+  X,
 } from "lucide-react";
 import { localTTS } from "@orca/local-tts";
 import { memoryEngine, type ChatMessage, type ChatSession, type ToolExecution, type AttachedFile } from "@orca/memory-engine";
@@ -49,9 +54,13 @@ import { SkillsModal, DEFAULT_SKILLS, type AgentSkill } from "./components/Skill
 import { AgentProgressCard, type AgentProgressState } from "./components/AgentProgressCard";
 import { AttachmentList } from "./components/FileAttachmentPreview";
 import { KokoroVoiceModal } from "./components/KokoroVoiceModal";
+import { ToolsModal, INITIAL_HERMES_TOOLS, type HermesTool } from "./components/ToolsModal";
 
 const DEFAULT_SYSTEM_PROMPT =
-  "You are Songbird, an advanced AI agent specialized in deep reasoning, software architecture, problem-solving, and synthesis. Structure your answers with clear markdown formatting, headings, and syntax-highlighted code blocks.";
+  "You are Songbird, an advanced AI agent specialized in deep reasoning, software architecture, problem-solving, and synthesis. Structure your answers with clear markdown formatting, headings, and syntax-highlighted code blocks.\n\n" +
+  "CRITICAL RULES:\n" +
+  "1. NO EMOJIS: Do NOT use any emojis or emoticons in your responses under any circumstances. Output clean, plain text only.\n" +
+  "2. MATH IN LATEX: Always write all mathematical expressions, formulas, equations, variables, and calculations using standard LaTeX notation ($...$ for inline math, $$...$$ for standalone display equations). Never output raw ASCII pseudo-math.";
 
 export default function App() {
   // Theme State
@@ -73,6 +82,21 @@ export default function App() {
     return DEFAULT_SKILLS;
   });
   const [isSkillsOpen, setIsSkillsOpen] = useState(false);
+
+  // Tools State (with LocalStorage persistence)
+  const [tools, setTools] = useState<HermesTool[]>(() => {
+    const saved = localStorage.getItem("songbird_tools_config_v1");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {
+        // Fallback
+      }
+    }
+    return INITIAL_HERMES_TOOLS;
+  });
+  const [isToolsOpen, setIsToolsOpen] = useState(false);
 
   // Attachments State (Draft files for current prompt)
   const [draftAttachments, setDraftAttachments] = useState<AttachedFile[]>([]);
@@ -130,6 +154,16 @@ export default function App() {
   const [micVolume, setMicVolume] = useState<number>(0); // 0 to 100
   const [isUserSpeaking, setIsUserSpeaking] = useState<boolean>(false);
   const [lastUnderstoodText, setLastUnderstoodText] = useState<string>("");
+  const [isDictating, setIsDictating] = useState<boolean>(false);
+  const isDictatingRef = useRef<boolean>(false);
+  isDictatingRef.current = isDictating;
+  const [sttHeardInfo, setSttHeardInfo] = useState<{
+    text: string;
+    latencyMs?: number;
+    timestamp: number;
+    source: "dictation" | "voice_agent";
+    device?: string;
+  } | null>(null);
 
   // Kokoro Voice Studio State (Voice Selection, Voice Blending & Model Controls)
   const [isKokoroModalOpen, setIsKokoroModalOpen] = useState<boolean>(false);
@@ -145,6 +179,9 @@ export default function App() {
     localStorage.setItem("songbird_voice_id", activeVoiceId);
     localStorage.setItem("songbird_voice_speed", String(speechSpeed));
   }, [activeVoiceId, speechSpeed]);
+
+  const [isCapturingScreen, setIsCapturingScreen] = useState<boolean>(false);
+  const mainViewContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Voice Pipeline Audio Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -374,8 +411,12 @@ export default function App() {
     let reconnectTimeout: ReturnType<typeof setTimeout>;
 
     const connect = () => {
-      ws = new WebSocket("ws://localhost:18789");
+      const host = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+        ? "127.0.0.1"
+        : window.location.hostname;
+      ws = new WebSocket(`ws://${host}:18789`);
       socketRef.current = ws;
+      (window as any).__songbirdSocket = ws;
 
       ws.onopen = () => {
         setIsEngineConnected(true);
@@ -413,11 +454,17 @@ export default function App() {
           } else if (data.type === "tool_start") {
             handleToolStart(data.tool_id, data.tool, data.input);
           } else if (data.type === "tool_result") {
-            handleToolResult(data.tool_id, data.tool, data.output, data.status);
+            handleToolResult(data.tool_id, data.tool, data.output, data.status, data.image_b64);
+          } else if (data.type === "stt_result") {
+            handleDictationSTTReceived(data.text, data.latency_ms, data.device);
+          } else if (data.type === "stt_error") {
+            setIsDictating(false);
+            isDictatingRef.current = false;
+            setVoiceStageInfo(`STT Notice: ${data.error || "Recognition failed"}`);
           } else if (data.type === "voice_stage") {
             setVoiceStageInfo(`Stage ${data.stage}: ${data.name}`);
           } else if (data.type === "voice_stt") {
-            handleVoiceSTTReceived(data.text, data.latency_ms);
+            handleVoiceSTTReceived(data.text, data.latency_ms, data.device);
           } else if (data.type === "voice_llm_token") {
             enqueueStreamToken(data.token, false);
           } else if (data.type === "voice_tts_chunk") {
@@ -456,11 +503,11 @@ export default function App() {
             data.type === "chatterbox_synthesize_result"
           ) {
             setIsSynthesizingSpeech(false);
-            if (readAloudActiveMsgIdRef.current === data.msg_id && data.audio_b64) {
+            if (data.audio_b64) {
               const mime = data.mime_type || "audio/wav";
               const audio = new Audio(`data:${mime};base64,${data.audio_b64}`);
               readAloudAudioRef.current = audio;
-              setSpeakingMsgId(data.msg_id);
+              if (data.msg_id) setSpeakingMsgId(data.msg_id);
 
               audio.onended = () => {
                 readAloudAudioRef.current = null;
@@ -509,6 +556,19 @@ export default function App() {
     };
   }, []);
 
+  // Global Keyboard Shortcut for Screenshot (Alt + Space)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && e.code === "Space") {
+        e.preventDefault();
+        handleCaptureScreen();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // Tool Start Handler
   const handleToolStart = (toolId: string, tool: string, input: any) => {
     setSessions((prev) => {
@@ -554,7 +614,7 @@ export default function App() {
   };
 
   // Tool Result Handler
-  const handleToolResult = (toolId: string, tool: string, output: string, status: "success" | "error") => {
+  const handleToolResult = (toolId: string, tool: string, output: string, status: "success" | "error", imageB64?: string) => {
     setSessions((prev) => {
       const targetId = activeSessionIdRef.current || (prev.length > 0 ? prev[0].id : "");
       const activeIdx = prev.findIndex((s) => s.id === targetId);
@@ -567,7 +627,7 @@ export default function App() {
 
       if (last && last.sender === "hermes" && last.toolExecutions) {
         const updatedTools = last.toolExecutions.map((t) =>
-          t.id === toolId ? { ...t, output, status } : t
+          t.id === toolId ? { ...t, output, status, image_b64: imageB64 || t.image_b64 } : t
         );
         msgs[msgs.length - 1] = { ...last, toolExecutions: updatedTools };
       }
@@ -691,11 +751,17 @@ export default function App() {
     typewriterTimerRef.current = requestAnimationFrame(tick);
   };
 
+  const stripEmojis = (text: string) => {
+    return text.replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, "");
+  };
+
   const enqueueStreamToken = (token: string, isThought: boolean) => {
+    const cleanToken = stripEmojis(token);
+    if (!cleanToken) return;
     if (isThought) {
-      typingThoughtQueueRef.current += token;
+      typingThoughtQueueRef.current += cleanToken;
     } else {
-      typingQueueRef.current += token;
+      typingQueueRef.current += cleanToken;
     }
     startTypewriterEngine();
   };
@@ -760,11 +826,21 @@ export default function App() {
     }
   };
 
-  const handleVoiceSTTReceived = (text: string, latencyMs?: number) => {
+  const handleVoiceSTTReceived = (text: string, latencyMs?: number, device?: string) => {
     if (!text.trim()) return;
 
-    setLastUnderstoodText(text);
-    setVoiceStageInfo(`Understood: "${text}" via Moonshine Tiny (${latencyMs || 0}ms)`);
+    const clean = text.trim();
+    setLastUnderstoodText(clean);
+    setSttHeardInfo({
+      text: clean,
+      latencyMs,
+      timestamp: Date.now(),
+      source: "voice_agent",
+      device,
+    });
+    // Dictate speech into the chat input so user sees what STT heard
+    setInput(clean);
+    setVoiceStageInfo(`Understood: "${clean}" via Moonshine Tiny (${latencyMs || 0}ms)`);
     setVoiceAgentStatus("processing");
 
     const userVoiceMessage: ChatMessage = {
@@ -835,14 +911,45 @@ export default function App() {
     return result;
   };
 
-  const sendVoiceAudioBlob = (blob: Blob) => {
+  const handleDictationSTTReceived = (text: string, latencyMs?: number, device?: string) => {
+    setIsDictating(false);
+    isDictatingRef.current = false;
+    setVoiceAgentStatus("idle");
+    if (!text || !text.trim()) {
+      setVoiceStageInfo("No speech detected by Moonshine Tiny.");
+      return;
+    }
+    const clean = text.trim();
+    setInput((prev) => (prev ? `${prev} ${clean}` : clean));
+    setSttHeardInfo({
+      text: clean,
+      latencyMs,
+      timestamp: Date.now(),
+      source: "dictation",
+      device,
+    });
+    setVoiceStageInfo(`Transcribed: "${clean}" via Moonshine Tiny (${latencyMs || 0}ms)`);
+  };
+
+  const sendVoiceAudioBlob = (blob: Blob, forDictation: boolean = false) => {
     if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) return;
     setVoiceAgentStatus("processing");
-    setVoiceStageInfo("Stage 1: Moonshine Tiny STT transcribing audio...");
+    setVoiceStageInfo("Moonshine Tiny STT transcribing audio...");
 
     const reader = new FileReader();
     reader.onloadend = () => {
       const base64Data = reader.result as string;
+
+      if (forDictation) {
+        socketRef.current?.send(
+          JSON.stringify({
+            action: "stt_transcribe",
+            audio: base64Data,
+          })
+        );
+        return;
+      }
+
       const recentMessages = (activeSession?.messages || []).slice(-6).map((m) => ({
         role: m.sender === "hermes" ? "assistant" : "user",
         content: m.text,
@@ -868,7 +975,7 @@ export default function App() {
     reader.readAsDataURL(blob);
   };
 
-  const startTurnRecording = async () => {
+  const startTurnRecording = async (forDictation: boolean = false) => {
     try {
       if (!mediaStreamRef.current || !mediaStreamRef.current.active) {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -885,6 +992,8 @@ export default function App() {
       pcmChunksRef.current = [];
       userSpokeOnceRef.current = false;
       silenceStartRef.current = null;
+      isRecordingTurnRef.current = true;
+      setIsRecordingTurn(true);
 
       // Setup AudioContext & Analyser
       if (!audioContextRef.current || audioContextRef.current.state === "closed") {
@@ -942,19 +1051,20 @@ export default function App() {
         const normalized = Math.min(100, Math.round((avg / 128) * 100));
         setMicVolume(normalized);
 
-        if (normalized > 10) {
+        // Lower threshold to 5 for high sensitivity
+        if (normalized > 5) {
           setIsUserSpeaking(true);
           userSpokeOnceRef.current = true;
           silenceStartRef.current = null;
-          setVoiceStageInfo("Hearing your voice... (Moonshine Tiny listening)");
+          setVoiceStageInfo(forDictation ? "Hearing dictation... (Moonshine Tiny active)" : "Hearing your voice... (Moonshine Tiny listening)");
         } else {
           setIsUserSpeaking(false);
-          if (userSpokeOnceRef.current) {
+          if (userSpokeOnceRef.current && !forDictation) {
             if (!silenceStartRef.current) {
               silenceStartRef.current = Date.now();
             } else if (Date.now() - silenceStartRef.current > 1300) {
-              // User finished speaking and 1.3s elapsed: auto-finish and send turn!
-              stopTurnRecording();
+              // User finished speaking in Voice Agent mode and 1.3s elapsed
+              stopTurnRecording(false);
               return;
             }
           }
@@ -982,25 +1092,27 @@ export default function App() {
       };
 
       recorder.start(250);
-      setIsRecordingTurn(true);
       setVoiceAgentStatus("listening");
-      setVoiceStageInfo("Listening to your voice... Speak anytime");
+      setVoiceStageInfo(forDictation ? "Listening for dictation... Click mic again to finish" : "Listening to your voice... Speak anytime");
     } catch (err) {
       console.error("Microphone access error:", err);
-      alert("Please grant microphone permission to use the Realtime Voice Agent.");
+      alert("Please grant microphone permission to use speech recognition.");
       setIsVoiceAgentActive(false);
+      setIsDictating(false);
+      isDictatingRef.current = false;
       setVoiceAgentStatus("idle");
     }
   };
 
-  const stopTurnRecording = () => {
+  const stopTurnRecording = (forDictation: boolean = false) => {
+    isRecordingTurnRef.current = false;
+    setIsRecordingTurn(false);
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = null;
     }
     setMicVolume(0);
     setIsUserSpeaking(false);
-    setIsRecordingTurn(false);
 
     if (scriptProcessorRef.current) {
       scriptProcessorRef.current.disconnect();
@@ -1010,6 +1122,8 @@ export default function App() {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.stop();
     }
+
+    const dictationMode = forDictation || isDictatingRef.current;
 
     // Process recorded PCM chunks into 16kHz WAV
     const chunks = pcmChunksRef.current;
@@ -1024,10 +1138,10 @@ export default function App() {
       const sampleRate = audioContextRef.current.sampleRate || 44100;
       const samples16k = downsampleTo16k(merged, sampleRate);
 
-      // Only send if speech duration is at least 0.25 seconds
-      if (samples16k.length >= 4000) {
+      // Send if speech duration is at least 0.15s (2400 samples)
+      if (samples16k.length >= 2400) {
         const wavBlob = encodeWavBlob(samples16k, 16000);
-        sendVoiceAudioBlob(wavBlob);
+        sendVoiceAudioBlob(wavBlob, dictationMode);
         return;
       }
     }
@@ -1037,14 +1151,14 @@ export default function App() {
       const audioBlob = new Blob(audioChunksRef.current, {
         type: mediaRecorderRef.current?.mimeType || "audio/webm",
       });
-      if (audioBlob.size > 1200) {
-        sendVoiceAudioBlob(audioBlob);
+      if (audioBlob.size > 800) {
+        sendVoiceAudioBlob(audioBlob, dictationMode);
       } else {
         setVoiceAgentStatus("listening");
-        if (isVoiceAgentActiveRef.current) {
+        if (isVoiceAgentActiveRef.current && !dictationMode) {
           setTimeout(() => {
             if (isVoiceAgentActiveRef.current && !isRecordingTurnRef.current) {
-              startTurnRecording();
+              startTurnRecording(false);
             }
           }, 350);
         }
@@ -1052,9 +1166,24 @@ export default function App() {
     }, 150);
   };
 
+  const toggleDictation = async () => {
+    if (isDictatingRef.current) {
+      isDictatingRef.current = false;
+      setIsDictating(false);
+      stopTurnRecording(true);
+    } else {
+      if (isVoiceAgentActive) {
+        await toggleVoiceAgent();
+      }
+      isDictatingRef.current = true;
+      setIsDictating(true);
+      await startTurnRecording(true);
+    }
+  };
+
   const toggleVoiceAgent = async () => {
     if (isVoiceAgentActive) {
-      stopTurnRecording();
+      stopTurnRecording(false);
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
         animFrameRef.current = null;
@@ -1081,10 +1210,13 @@ export default function App() {
       setVoiceAgentStatus("idle");
       setVoiceStageInfo("");
     } else {
+      if (isDictating) {
+        await toggleDictation();
+      }
       setIsVoiceAgentActive(true);
       setVoiceAgentStatus("listening");
       setVoiceStageInfo("Moonshine Tiny + LLM API + Kokoro TTS ready");
-      await startTurnRecording();
+      await startTurnRecording(false);
     }
   };
 
@@ -1266,6 +1398,8 @@ export default function App() {
           base_url: baseUrl,
           model: selectedModel,
           skills: activeSkills,
+          enabled_tools: tools.filter((t) => t.enabled).map((t) => t.name),
+          custom_tools: tools.filter((t) => t.isCustom && t.enabled),
           messages: currentMsgs.map((m, idx) => ({
             sender: m.sender,
             content: idx === currentMsgs.length - 1 ? augmentedContent : m.text,
@@ -1273,16 +1407,68 @@ export default function App() {
           })),
           temperature,
           system_prompt: systemPrompt,
+          auto_tts: autoTTS,
+          voice_config: { voice: activeVoiceId, speed: speechSpeed },
         })
       );
     } else {
       setTimeout(() => {
         enqueueStreamToken(
-          "⚠️ Engine daemon is offline (`ws://localhost:18789`). Please start the engine with `pnpm dev:engine`.",
+          "[Notice] Engine daemon is offline (`ws://localhost:18789`). Please start the engine with `pnpm dev:engine`.",
           false
         );
         handleStreamDone();
       }, 500);
+    }
+  };
+
+  // Screen Capture Helper for Multimodal Analysis
+  const captureScreenSnapshot = async (): Promise<AttachedFile | null> => {
+    try {
+      setIsCapturingScreen(true);
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false,
+      });
+      const track = stream.getVideoTracks()[0];
+
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      await video.play();
+
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth || 1920;
+      canvas.height = video.videoHeight || 1080;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        track.stop();
+        return null;
+      }
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      track.stop();
+
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      const screenAtt: AttachedFile = {
+        id: "screen_" + Date.now(),
+        name: `Screen_${new Date().toLocaleTimeString().replace(/:/g, "-")}.jpg`,
+        size: Math.round((dataUrl.length * 3) / 4),
+        type: "image/jpeg",
+        dataUrl,
+      };
+      return screenAtt;
+    } catch (err) {
+      console.warn("Screen capture cancelled or failed:", err);
+      return null;
+    } finally {
+      setIsCapturingScreen(false);
+    }
+  };
+
+  const handleCaptureScreen = async () => {
+    const screenAtt = await captureScreenSnapshot();
+    if (screenAtt) {
+      setDraftAttachments((prev) => [...prev, screenAtt]);
+      setIsAttachMenuOpen(false);
     }
   };
 
@@ -1342,6 +1528,7 @@ export default function App() {
   const hasKey = Boolean(apiKey.trim());
   const isDark = theme === "dark";
   const activeSkillsCount = skills.filter((s) => s.enabled).length;
+  const activeToolsCount = tools.filter((t) => t.enabled).length;
   const currentLogo = isDark ? "/songbird-logo-dark.png" : "/songbird-logo-light.png";
 
   return (
@@ -1427,6 +1614,15 @@ export default function App() {
         setActiveVoiceId={setActiveVoiceId}
         speechSpeed={speechSpeed}
         setSpeechSpeed={setSpeechSpeed}
+      />
+
+      {/* Hermes Tools & Custom Capabilities Modal */}
+      <ToolsModal
+        isOpen={isToolsOpen}
+        onClose={() => setIsToolsOpen(false)}
+        theme={theme}
+        tools={tools}
+        setTools={setTools}
       />
 
       {/* ==================== LEFT SIDEBAR ==================== */}
@@ -1551,6 +1747,26 @@ export default function App() {
           </button>
         </div>
 
+        {/* Hermes Tools Window Button in Sidebar */}
+        <div className="px-3 py-1">
+          <button
+            onClick={() => setIsToolsOpen(true)}
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-xs font-medium transition ${
+              isDark
+                ? "bg-[#222222] hover:bg-[#282828] border-[#333333] text-[#dcdcdc]"
+                : "bg-[#ffffff] hover:bg-[#f4f4f0] border-[#d8d8d0] text-[#333330]"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Wrench size={14} className="text-indigo-400" />
+              <span>Hermes Tools</span>
+            </div>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-400 font-mono font-semibold">
+              {activeToolsCount} Active
+            </span>
+          </button>
+        </div>
+
         {/* Search Chats Input */}
         <div className="px-3 py-1">
           <div
@@ -1658,7 +1874,10 @@ export default function App() {
       </aside>
 
       {/* ==================== MAIN WORKSPACE ==================== */}
-      <div className="flex-1 flex flex-col h-full relative overflow-hidden bg-[var(--sb-bg-canvas)]">
+      <div
+        className="flex-1 flex flex-col h-full relative overflow-hidden bg-[var(--sb-bg-canvas)]"
+        ref={mainViewContainerRef}
+      >
         {/* Top Navbar */}
         <header
           className={`h-13 px-4 flex items-center justify-between border-b z-20 select-none relative transition ${
@@ -1700,7 +1919,7 @@ export default function App() {
             {/* Agent Mode Indicator Pill */}
             <button
               onClick={() => setIsAgentMode(!isAgentMode)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition cursor-pointer ${
                 isAgentMode
                   ? "bg-rose-500/20 border-rose-500/50 text-rose-500 shadow-sm"
                   : isDark
@@ -1709,7 +1928,7 @@ export default function App() {
               }`}
             >
               <Bot size={13} className={isAgentMode ? "text-rose-500 animate-pulse" : ""} />
-              <span>{isAgentMode ? "Hermes Agent" : "Chat Mode"}</span>
+              <span>{isAgentMode ? "Hermes Agent Active" : "Standard Chat"}</span>
             </button>
 
             {/* Realtime Voice Agent Activation Button (Moonshine Tiny + LLM + Kokoro TTS) */}
@@ -1784,6 +2003,23 @@ export default function App() {
             >
               <Sparkles size={13} className="text-amber-400" />
               <span>Kokoro Studio</span>
+            </button>
+
+            {/* Hermes Tools Studio & Custom Capability Button */}
+            <button
+              onClick={() => setIsToolsOpen(true)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition cursor-pointer ${
+                isDark
+                  ? "bg-[#262626] hover:bg-[#303030] border-[#383838] hover:border-indigo-500/50 text-[#dcdcd0] hover:text-indigo-300"
+                  : "bg-[#f4f4f0] hover:bg-[#eaeae4] border-[#d8d8d0] hover:border-indigo-500/50 text-[#60605a] hover:text-black"
+              }`}
+              title="Open Hermes Tools & Custom Capabilities Window (80+ tools, schemas, computer_use, and custom runners)"
+            >
+              <Wrench size={13} className="text-indigo-400" />
+              <span>Tools</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-400 font-mono font-semibold">
+                {activeToolsCount}
+              </span>
             </button>
           </div>
 
@@ -2118,130 +2354,6 @@ export default function App() {
               />
             )}
 
-            {/* Realtime Voice Agent Live Status Bar with Live Hearing Indicator & Understood Preview */}
-            {isVoiceAgentActive && (
-              <div
-                className={`mb-2 px-4 py-3 rounded-2xl border flex flex-col gap-2 shadow-xl animate-fade-in transition-all ${
-                  isDark
-                    ? isUserSpeaking
-                      ? "bg-[#182a20] border-emerald-500/70 shadow-emerald-950/30"
-                      : "bg-[#252525] border-rose-900/50 text-rose-300"
-                    : isUserSpeaking
-                    ? "bg-emerald-50 border-emerald-400 shadow-emerald-500/10"
-                    : "bg-rose-50 border-rose-200 text-rose-700"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    {/* Live 12-bar audio spectrum visualizer */}
-                    <div className="flex items-center gap-0.5 h-4 px-1 shrink-0">
-                      {[0.8, 1.2, 0.6, 1.4, 1.0, 0.7, 1.3, 0.9, 1.5, 0.5, 1.1, 0.8].map((mult, barIdx) => {
-                        const barHeight = isUserSpeaking
-                          ? Math.max(3, Math.min(18, Math.round(micVolume * mult * 0.22)))
-                          : voiceAgentStatus === "speaking"
-                          ? (barIdx % 2 === 0 ? 12 : 5)
-                          : 3;
-                        return (
-                          <span
-                            key={barIdx}
-                            className={`w-0.5 rounded-full transition-all duration-75 ${
-                              isUserSpeaking
-                                ? "bg-emerald-400"
-                                : voiceAgentStatus === "speaking"
-                                ? "bg-rose-500"
-                                : isDark
-                                ? "bg-[#555555]"
-                                : "bg-[#c0c0b8]"
-                            }`}
-                            style={{ height: `${barHeight}px` }}
-                          />
-                        );
-                      })}
-                    </div>
-
-                    <div className="flex flex-col min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-bold tracking-wide">Realtime Voice Agent</span>
-                        {isUserSpeaking ? (
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 font-mono text-[10px] font-bold uppercase animate-voice-hearing flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                            Hearing You ({micVolume}%)
-                          </span>
-                        ) : (
-                          <span
-                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-medium uppercase ${
-                              voiceAgentStatus === "speaking"
-                                ? "bg-rose-500/20 text-rose-500 border border-rose-500/40"
-                                : "bg-neutral-500/20 text-neutral-400"
-                            }`}
-                          >
-                            {voiceAgentStatus === "speaking" ? "Speaking Response" : voiceAgentStatus === "processing" ? "Processing" : "Listening"}
-                          </span>
-                        )}
-                      </div>
-
-                      <span className="text-[11px] opacity-80 truncate mt-0.5">
-                        {isUserSpeaking
-                          ? "Microphone detecting your voice in real time... (Moonshine Tiny STT active)"
-                          : voiceStageInfo || "Speak naturally — Moonshine Tiny STT & Kokoro TTS are ready."}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    {isRecordingTurn ? (
-                      <button
-                        onClick={stopTurnRecording}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow transition cursor-pointer"
-                        title="Finish speaking and process turn"
-                      >
-                        <Square size={10} className="fill-current" />
-                        <span>Finish Speaking</span>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={startTurnRecording}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/20 hover:bg-rose-500/30 text-rose-500 text-xs font-semibold border border-rose-500/40 transition cursor-pointer"
-                        title="Start recording voice turn"
-                      >
-                        <Mic size={12} />
-                        <span>Speak Now</span>
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => setIsKokoroModalOpen(true)}
-                      className="p-1.5 rounded-lg text-xs opacity-75 hover:opacity-100 hover:text-amber-400 transition cursor-pointer"
-                      title="Kokoro Voice Settings & Blending"
-                    >
-                      <Sparkles size={14} />
-                    </button>
-
-                    <button
-                      onClick={toggleVoiceAgent}
-                      className="p-1.5 rounded-lg text-xs opacity-60 hover:opacity-100 hover:text-rose-500 transition cursor-pointer"
-                      title="Turn OFF Voice Agent"
-                    >
-                      <MicOff size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Understood Speech Preview Chip */}
-                {lastUnderstoodText && (
-                  <div
-                    className={`mt-1 px-3 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-sans transition animate-fade-in ${
-                      isDark ? "bg-[#1f1f1f] border-emerald-800/40 text-emerald-300" : "bg-white border-emerald-300 text-emerald-800 shadow-sm"
-                    }`}
-                  >
-                    <Check size={13} className="text-emerald-400 shrink-0" />
-                    <span className="text-[11px] font-semibold shrink-0 text-emerald-400 uppercase font-mono">Understood:</span>
-                    <span className="truncate italic">"{lastUnderstoodText}"</span>
-                  </div>
-                )}
-              </div>
-            )}
-
             <div
               className={`rounded-3xl p-3.5 flex flex-col gap-2.5 shadow-xl border transition relative ${
                 isDark
@@ -2262,6 +2374,141 @@ export default function App() {
                 />
               )}
 
+              {/* Unified Voice Agent Hearing & Heard Status inside Chat Bar */}
+              {(isVoiceAgentActive || sttHeardInfo) && (
+                <div
+                  className={`px-3 py-2 rounded-2xl border flex items-center justify-between gap-3 text-xs animate-fade-in transition shadow-sm ${
+                    isUserSpeaking
+                      ? isDark
+                        ? "bg-emerald-950/40 border-emerald-500/60 text-emerald-300 shadow-emerald-950/20"
+                        : "bg-emerald-50 border-emerald-400 text-emerald-900 shadow-emerald-100"
+                      : sttHeardInfo
+                      ? isDark
+                        ? "bg-[#252525] border-emerald-600/50 text-[#f0f0f0]"
+                        : "bg-emerald-50/90 border-emerald-300 text-[#1a1a1a]"
+                      : voiceAgentStatus === "speaking"
+                      ? isDark
+                        ? "bg-rose-950/30 border-rose-500/50 text-rose-300"
+                        : "bg-rose-50 border-rose-300 text-rose-900"
+                      : isDark
+                      ? "bg-[#242424] border-[#383838] text-[#dcdcdc]"
+                      : "bg-[#f5f5f0] border-[#dcdcd4] text-[#2c2c2a]"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div className="relative flex items-center justify-center w-5 h-5 shrink-0">
+                      {isUserSpeaking ? (
+                        <>
+                          <span className="animate-ping absolute inline-flex h-3.5 w-3.5 rounded-full bg-emerald-400 opacity-75"></span>
+                          <Mic size={14} className="text-emerald-400 relative z-10" />
+                        </>
+                      ) : voiceAgentStatus === "speaking" ? (
+                        <AudioLines size={14} className="text-rose-400 animate-pulse relative z-10" />
+                      ) : sttHeardInfo ? (
+                        <Check size={14} strokeWidth={3} className="text-emerald-400 relative z-10" />
+                      ) : (
+                        <Mic size={14} className="text-emerald-400/80 relative z-10" />
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      {sttHeardInfo ? (
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-[10px] font-bold font-mono uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 shrink-0">
+                            Heard
+                          </span>
+                          <span className="font-semibold text-xs truncate" title={sttHeardInfo.text}>
+                            "{sttHeardInfo.text}"
+                          </span>
+                          {sttHeardInfo.latencyMs !== undefined && (
+                            <span className="text-[10px] font-mono text-[var(--sb-text-muted)] shrink-0 hidden sm:inline">
+                              ⚡ {Math.round(sttHeardInfo.latencyMs)}ms
+                            </span>
+                          )}
+                          {sttHeardInfo.device && (
+                            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-400/90 font-mono shrink-0 hidden md:inline">
+                              {sttHeardInfo.device.toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                      ) : isUserSpeaking ? (
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-semibold text-xs text-emerald-400">
+                            Hearing voice...
+                          </span>
+                          <span className="text-[10px] font-mono text-[var(--sb-text-muted)]">
+                            ({micVolume}%)
+                          </span>
+                        </div>
+                      ) : voiceAgentStatus === "speaking" ? (
+                        <span className="font-semibold text-xs text-rose-400">
+                          Voice Agent replying (Kokoro TTS)...
+                        </span>
+                      ) : voiceAgentStatus === "processing" ? (
+                        <span className="font-semibold text-xs text-amber-400 animate-pulse">
+                          Moonshine Tiny transcribing speech...
+                        </span>
+                      ) : (
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-semibold text-[11px] font-mono tracking-wide uppercase text-emerald-400 flex items-center gap-1.5">
+                            Voice Agent Listening
+                            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 font-sans font-medium">
+                              Moonshine Tiny
+                            </span>
+                          </span>
+                          <span className="text-[10px] opacity-75 truncate">
+                            Speak anytime — Transcribes speech to chat bar & answers with voice
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Real-time audio waveform equalizer bars & Dismiss */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-black/10 dark:bg-black/30">
+                      {[14, 28, 55, 75, 48, 24, 62].map((baseHeight, idx) => {
+                        const factor = isUserSpeaking
+                          ? Math.max(0.2, micVolume / 100)
+                          : voiceAgentStatus === "speaking"
+                          ? 0.45
+                          : 0.12;
+                        const barHeight = Math.max(4, Math.round(baseHeight * factor * 0.24));
+                        return (
+                          <span
+                            key={idx}
+                            className={`w-1 rounded-full transition-all duration-75 ${
+                              isUserSpeaking
+                                ? "bg-emerald-400"
+                                : voiceAgentStatus === "speaking"
+                                ? "bg-rose-400"
+                                : "bg-emerald-500/40"
+                            }`}
+                            style={{ height: `${barHeight}px` }}
+                          />
+                        );
+                      })}
+                    </div>
+
+                    {sttHeardInfo && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (input === sttHeardInfo.text) {
+                            setInput("");
+                          }
+                          setSttHeardInfo(null);
+                        }}
+                        className="p-1 rounded-lg text-[var(--sb-text-muted)] hover:text-white transition cursor-pointer"
+                        title="Dismiss heard text"
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -2275,7 +2522,13 @@ export default function App() {
                 }}
                 rows={1}
                 placeholder={
-                  isAgentMode
+                  isVoiceAgentActive
+                    ? isUserSpeaking
+                      ? "Hearing your voice... (Moonshine Tiny STT)"
+                      : sttHeardInfo
+                      ? `Voice heard: "${sttHeardInfo.text}"`
+                      : "Voice Agent listening... Speak anytime"
+                    : isAgentMode
                     ? "Assign an autonomous task to Hermes Agent (with files & pictures)..."
                     : `Message ${selectedModel}...`
                 }
@@ -2360,6 +2613,26 @@ export default function App() {
                           <span className="text-[10px] text-[var(--sb-text-muted)] truncate">PDF, CSV, JSON, TXT, Code</span>
                         </div>
                       </button>
+
+                      {/* 3. Capture Screen for Multimodal Analysis */}
+                      <button
+                        type="button"
+                        onClick={handleCaptureScreen}
+                        disabled={isCapturingScreen}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition group ${
+                          isDark ? "hover:bg-[#2a2a2a]" : "hover:bg-[#f3f3ee]"
+                        }`}
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+                          <Monitor size={16} />
+                        </div>
+                        <div className="flex flex-col flex-1 min-w-0">
+                          <span className="text-xs font-semibold text-cyan-400">Capture Screen</span>
+                          <span className="text-[10px] text-[var(--sb-text-muted)] truncate">
+                            {isCapturingScreen ? "Capturing..." : "Take snapshot for multimodal analysis"}
+                          </span>
+                        </div>
+                      </button>
                     </div>
                   )}
 
@@ -2379,22 +2652,31 @@ export default function App() {
                     <span>Agent Mode</span>
                   </button>
 
-                  {/* Realtime Voice Agent Quick Toggle */}
+                  {/* Unified Voice Agent Button (Moonshine STT Dictation + Hermes Reasoning + Kokoro TTS) */}
                   <button
+                    type="button"
                     onClick={toggleVoiceAgent}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition cursor-pointer ${
                       isVoiceAgentActive
-                        ? "bg-rose-500/20 border-rose-500/60 text-rose-500 shadow-sm animate-voice-glow"
+                        ? isUserSpeaking
+                          ? "bg-emerald-500/20 border-emerald-500/70 text-emerald-400 shadow-sm animate-pulse"
+                          : voiceAgentStatus === "speaking"
+                          ? "bg-rose-500/20 border-rose-500/70 text-rose-400 shadow-sm animate-voice-rose-ripple"
+                          : "bg-rose-500/20 border-rose-500/60 text-rose-500 shadow-sm animate-voice-glow"
                         : isDark
                         ? "bg-[#282828] hover:bg-[#333333] border-[#383838] text-[#888888] hover:text-white"
                         : "bg-[#f4f4f0] hover:bg-[#ebebe4] border-[#d8d8d0] text-[#70706a] hover:text-black"
                     }`}
-                    title="Toggle Realtime Voice Agent (Moonshine Tiny STT + LLM API + Kokoro TTS)"
+                    title={
+                      isVoiceAgentActive
+                        ? "Voice Agent Active: Dictating speech into chat & replying with Kokoro TTS (Click to stop)"
+                        : "Voice Agent (Dictate with Moonshine STT & converse with Kokoro TTS)"
+                    }
                   >
                     {isVoiceAgentActive ? (
                       <>
-                        <AudioLines size={14} className="text-rose-500" />
-                        <span>Voice ON</span>
+                        <AudioLines size={14} className={isUserSpeaking ? "text-emerald-400" : "text-rose-500"} />
+                        <span>{isUserSpeaking ? "Hearing..." : voiceAgentStatus === "speaking" ? "Speaking..." : "Voice ON"}</span>
                       </>
                     ) : (
                       <>
