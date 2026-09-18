@@ -55,6 +55,7 @@ import { AgentProgressCard, type AgentProgressState } from "./components/AgentPr
 import { AttachmentList } from "./components/FileAttachmentPreview";
 import { KokoroVoiceModal } from "./components/KokoroVoiceModal";
 import { ToolsModal, INITIAL_HERMES_TOOLS, type HermesTool } from "./components/ToolsModal";
+import { CodeEditorPanel } from "./components/CodeEditorPanel";
 
 const DEFAULT_SYSTEM_PROMPT =
   "You are Songbird, an advanced AI agent specialized in deep reasoning, software architecture, problem-solving, and synthesis. Structure your answers with clear markdown formatting, headings, and syntax-highlighted code blocks.\n\n" +
@@ -83,13 +84,22 @@ export default function App() {
   });
   const [isSkillsOpen, setIsSkillsOpen] = useState(false);
 
-  // Tools State (with LocalStorage persistence)
+  // Tools State (with LocalStorage persistence and auto-migration of new built-in tools)
   const [tools, setTools] = useState<HermesTool[]>(() => {
     const saved = localStorage.getItem("songbird_tools_config_v1");
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const existingIds = new Set(parsed.map((t: HermesTool) => t.id || t.name));
+          const missing = INITIAL_HERMES_TOOLS.filter((t) => !existingIds.has(t.id || t.name));
+          if (missing.length > 0) {
+            const merged = [...parsed, ...missing];
+            localStorage.setItem("songbird_tools_config_v1", JSON.stringify(merged));
+            return merged;
+          }
+          return parsed;
+        }
       } catch {
         // Fallback
       }
@@ -113,6 +123,16 @@ export default function App() {
   const [isAgentMode, setIsAgentMode] = useState<boolean>(() => {
     return localStorage.getItem("songbird_agent_mode") === "true";
   });
+
+  // Code Editor Studio State
+  const [isCodeEditorOpen, setIsCodeEditorOpen] = useState<boolean>(() => {
+    return localStorage.getItem("songbird_code_editor_open") === "true";
+  });
+  const [externalOpenFile, setExternalOpenFile] = useState<{ path: string; content?: string; language?: string } | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem("songbird_code_editor_open", String(isCodeEditorOpen));
+  }, [isCodeEditorOpen]);
 
   // Provider & API Key State (with LocalStorage persistence)
   const [provider, setProvider] = useState<AIProvider>(() => {
@@ -382,6 +402,10 @@ export default function App() {
         e.preventDefault();
         handleNewChat();
       }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        setIsCodeEditorOpen((prev) => !prev);
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -455,6 +479,15 @@ export default function App() {
             handleToolStart(data.tool_id, data.tool, data.input);
           } else if (data.type === "tool_result") {
             handleToolResult(data.tool_id, data.tool, data.output, data.status, data.image_b64);
+          } else if (data.type === "editor_agent_sync") {
+            setIsCodeEditorOpen(true);
+            setExternalOpenFile({
+              path: data.file_path,
+              content: data.content,
+              language: data.language,
+            });
+          } else if (data.type === "editor_run_output") {
+            setIsCodeEditorOpen(true);
           } else if (data.type === "stt_result") {
             handleDictationSTTReceived(data.text, data.latency_ms, data.device);
           } else if (data.type === "stt_error") {
@@ -1767,6 +1800,28 @@ export default function App() {
           </button>
         </div>
 
+        {/* Code Studio (Monaco Editor) Button in Sidebar */}
+        <div className="px-3 py-1">
+          <button
+            onClick={() => setIsCodeEditorOpen(!isCodeEditorOpen)}
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-xs font-medium transition ${
+              isCodeEditorOpen
+                ? "bg-rose-500/15 border-rose-500/40 text-rose-500 shadow-sm"
+                : isDark
+                ? "bg-[#222222] hover:bg-[#282828] border-[#333333] text-[#dcdcdc]"
+                : "bg-[#ffffff] hover:bg-[#f4f4f0] border-[#d8d8d0] text-[#333330]"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Code2 size={14} className="text-rose-500" />
+              <span>Code Studio</span>
+            </div>
+            <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold text-[var(--sb-text-muted)]">
+              {isCodeEditorOpen ? "Active" : "Ctrl+Shift+E"}
+            </span>
+          </button>
+        </div>
+
         {/* Search Chats Input */}
         <div className="px-3 py-1">
           <div
@@ -2021,6 +2076,25 @@ export default function App() {
                 {activeToolsCount}
               </span>
             </button>
+
+            {/* Code Studio Split View Toggle Button */}
+            <button
+              onClick={() => setIsCodeEditorOpen(!isCodeEditorOpen)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition shadow-sm ${
+                isCodeEditorOpen
+                  ? "bg-rose-500/20 border-rose-500/50 text-rose-500 shadow-rose-500/10"
+                  : isDark
+                  ? "bg-[#212121] border-[#343434] text-[#dcdcdc] hover:border-rose-500/30 hover:text-white"
+                  : "bg-[#ffffff] border-[#d8d8d0] text-[#333330] hover:border-rose-500/30 hover:text-black"
+              }`}
+              title="Toggle Split-Screen Code Studio (Ctrl+Shift+E)"
+            >
+              <Code2 size={13} className="text-rose-500" />
+              <span>Code Studio</span>
+              <span className="text-[10px] px-1 rounded bg-rose-500/20 text-rose-500 font-mono">
+                IDE
+              </span>
+            </button>
           </div>
 
           {/* Right Status Badges */}
@@ -2078,8 +2152,16 @@ export default function App() {
           )}
         </header>
 
-        {/* ==================== CENTER CHAT FEED (SCROLLABLE AREA ONLY) ==================== */}
-        <main className="flex-1 overflow-y-auto px-4 py-4 flex flex-col items-center">
+        {/* ==================== WORKSPACE SPLIT CONTAINER (CHAT + CODE STUDIO) ==================== */}
+        <div className="flex-1 flex overflow-hidden min-h-0 relative">
+          {/* Left Chat & Input Column */}
+          <div
+            className={`flex flex-col h-full overflow-hidden transition-all duration-200 ${
+              isCodeEditorOpen ? "w-1/2 min-w-[340px] border-r border-[var(--sb-border)]" : "w-full flex-1"
+            }`}
+          >
+            {/* ==================== CENTER CHAT FEED (SCROLLABLE AREA ONLY) ==================== */}
+            <main className="flex-1 overflow-y-auto px-4 py-4 flex flex-col items-center">
           {!hasMessages ? (
             /* ==================== EMPTY STATE ==================== */
             <div className="w-full max-w-3xl my-auto flex flex-col items-center justify-center space-y-6 pt-2 animate-fade-in">
@@ -2260,6 +2342,22 @@ export default function App() {
                         <MarkdownRenderer
                           content={msg.text}
                           isStreaming={isStreaming && idx === activeSession.messages.length - 1}
+                          onOpenInEditor={(code, language) => {
+                            setIsCodeEditorOpen(true);
+                            const ext =
+                              language === "python"
+                                ? "py"
+                                : language === "javascript"
+                                ? "js"
+                                : language === "typescript"
+                                ? "ts"
+                                : "txt";
+                            setExternalOpenFile({
+                              path: `snippets/snippet_${Date.now()}.${ext}`,
+                              content: code,
+                              language,
+                            });
+                          }}
                         />
                       )}
 
@@ -2728,6 +2826,26 @@ export default function App() {
           </div>
         </footer>
       </div>
+
+      {/* Right Split Column: Code Studio Monaco Editor */}
+      {isCodeEditorOpen && (
+        <div className="w-1/2 h-full flex flex-col min-w-[380px] overflow-hidden">
+          <CodeEditorPanel
+            theme={theme}
+            isOpen={isCodeEditorOpen}
+            onClose={() => setIsCodeEditorOpen(false)}
+            ws={socketRef.current}
+            onSendToChat={(prompt) => {
+              setInput(prompt);
+              setTimeout(() => textareaRef.current?.focus(), 100);
+            }}
+            externalOpenFile={externalOpenFile}
+            onExternalFileOpened={() => setExternalOpenFile(null)}
+          />
+        </div>
+      )}
     </div>
+  </div>
+</div>
   );
 }

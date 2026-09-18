@@ -36,4 +36,7 @@ Thumbs.db
 
 # Scratch and Temp
 scratch/
+scratch.py
+hello.py
+.songbird_*
 

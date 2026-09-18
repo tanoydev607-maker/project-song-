@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { Check, Copy, Code, Sigma } from "lucide-react";
+import { Check, Copy, Code, Sigma, Code2 } from "lucide-react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 
 interface MarkdownRendererProps {
   content: string;
   isStreaming?: boolean;
+  onOpenInEditor?: (code: string, language: string) => void;
 }
 
 const stripEmojis = (text: string): string => {
@@ -13,11 +14,11 @@ const stripEmojis = (text: string): string => {
   return text.replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, "");
 };
 
-export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isStreaming }) => {
+export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isStreaming, onOpenInEditor }) => {
   const cleanContent = stripEmojis(content);
   return (
     <div className={`space-y-3.5 leading-relaxed text-sm md:text-[15px] font-normal tracking-normal ${isStreaming ? "chat-streaming-cursor" : ""}`}>
-      {renderBlocks(cleanContent)}
+      {renderBlocks(cleanContent, onOpenInEditor)}
     </div>
   );
 };
@@ -25,9 +26,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isS
 interface CodeBlockProps {
   language: string;
   code: string;
+  onOpenInEditor?: (code: string, language: string) => void;
 }
 
-const CodeBlock: React.FC<CodeBlockProps> = ({ language, code }) => {
+const CodeBlock: React.FC<CodeBlockProps> = ({ language, code, onOpenInEditor }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -47,23 +49,35 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ language, code }) => {
           <Code size={14} className="text-rose-500" />
           <span>{language || "code"}</span>
         </div>
-        <button
-          onClick={handleCopy}
-          className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md hover:bg-[var(--sb-hover-bg)] text-[var(--sb-text-secondary)] hover:text-[var(--sb-text-primary)] transition"
-          title="Copy code"
-        >
-          {copied ? (
-            <>
-              <Check size={13} className="text-emerald-500" />
-              <span className="text-emerald-500 font-medium">Copied</span>
-            </>
-          ) : (
-            <>
-              <Copy size={13} />
-              <span>Copy</span>
-            </>
+        <div className="flex items-center gap-1">
+          {onOpenInEditor && (
+            <button
+              onClick={() => onOpenInEditor(code, language)}
+              className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-md hover:bg-[var(--sb-hover-bg)] text-[var(--sb-text-secondary)] hover:text-rose-500 transition"
+              title="Open code in Code Studio"
+            >
+              <Code2 size={13} />
+              <span>Open in Studio</span>
+            </button>
           )}
-        </button>
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md hover:bg-[var(--sb-hover-bg)] text-[var(--sb-text-secondary)] hover:text-[var(--sb-text-primary)] transition"
+            title="Copy code"
+          >
+            {copied ? (
+              <>
+                <Check size={13} className="text-emerald-500" />
+                <span className="text-emerald-500 font-medium">Copied</span>
+              </>
+            ) : (
+              <>
+                <Copy size={13} />
+                <span>Copy</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
       <pre className="p-4 overflow-x-auto text-[var(--sb-text-primary)] font-mono leading-normal select-text">
         <code>{code}</code>
@@ -166,7 +180,7 @@ const InlineMath: React.FC<{ math: string }> = ({ math }) => {
   );
 };
 
-function renderBlocks(markdown: string): React.ReactNode[] {
+function renderBlocks(markdown: string, onOpenInEditor?: (code: string, language: string) => void): React.ReactNode[] {
   if (!markdown) return [];
 
   const lines = markdown.split("\n");
@@ -209,6 +223,7 @@ function renderBlocks(markdown: string): React.ReactNode[] {
             key={`code-${nodes.length}`}
             language={codeLang}
             code={codeBuffer.join("\n")}
+            onOpenInEditor={onOpenInEditor}
           />
         );
         codeBuffer = [];
@@ -345,6 +360,7 @@ function renderBlocks(markdown: string): React.ReactNode[] {
         key={`code-${nodes.length}`}
         language={codeLang}
         code={codeBuffer.join("\n")}
+        onOpenInEditor={onOpenInEditor}
       />
     );
   }

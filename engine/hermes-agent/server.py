@@ -7,6 +7,7 @@ import os
 import re
 import sys
 import subprocess
+import time
 import zipfile
 from xml.etree import ElementTree as ET
 import httpx
@@ -95,6 +96,29 @@ def is_model_vision_capable(model_id: str) -> bool:
         return False
     return any(k in mid for k in VISION_MODEL_KEYWORDS)
 
+def get_language_from_filename(filename: str) -> str:
+    ext = filename.split(".")[-1].lower() if "." in filename else ""
+    mapping = {
+        "py": "python",
+        "js": "javascript",
+        "jsx": "javascript",
+        "ts": "typescript",
+        "tsx": "typescript",
+        "html": "html",
+        "css": "css",
+        "json": "json",
+        "md": "markdown",
+        "rs": "rust",
+        "cpp": "cpp",
+        "c": "cpp",
+        "sql": "sql",
+        "yaml": "yaml",
+        "yml": "yaml",
+        "sh": "shell",
+        "ps1": "powershell"
+    }
+    return mapping.get(ext, "plaintext")
+
 def build_tools_system_prompt(enabled_tools: list[str] = None, custom_tools: list[dict] = None) -> str:
     """Dynamically format active built-in Hermes tools and user custom tools for the agent prompt."""
     lines = [
@@ -112,19 +136,28 @@ def build_tools_system_prompt(enabled_tools: list[str] = None, custom_tools: lis
         ("read_file", "file_path: str", "Read file contents directly."),
         ("list_directory", "path: str = '.'", "List directory files and folders."),
         ("web_search", "query: str", "Search DuckDuckGo / Instant answers for real-time info."),
+        ("editor_open_file", "file_path: str", "Open and display any workspace file in the user's split-screen Code Studio (Monaco Editor)."),
+        ("editor_write_file", "file_path: str, content: str", "Write or overwrite a file, saving it and instantly opening/displaying it in the user's Code Studio IDE."),
+        ("editor_show_code", "code: str, language: str = 'python', title: str = 'solution.py'", "Display code, algorithms, or snippets in a live buffer tab directly inside Code Studio."),
+        ("editor_run", "code: str = '', file_path: str = '', language: str = 'python'", "Execute code inside Code Studio and stream real-time output into the IDE terminal console."),
     ]
     
+    ALWAYS_ENABLED_TOOLS = {
+        "editor_open_file", "editor_write_file", "editor_show_code", "editor_run",
+        "write_file", "read_file", "execute_python", "execute_command", "list_directory"
+    }
+
     enabled_set = set(enabled_tools) if enabled_tools else None
     
     idx = 1
     for name, params, desc in songbird_tools:
-        if enabled_set is None or name in enabled_set:
+        if enabled_set is None or name in enabled_set or name in ALWAYS_ENABLED_TOOLS:
             lines.append(f"{idx}. {name}({params}) -> {desc}")
             idx += 1
             
     if registry:
         for name, entry in list(registry._tools.items()):
-            if enabled_set is not None and name not in enabled_set:
+            if enabled_set is not None and name not in enabled_set and name not in ALWAYS_ENABLED_TOOLS:
                 continue
             if any(name == sb[0] for sb in songbird_tools):
                 continue
@@ -163,6 +196,30 @@ def build_tools_system_prompt(enabled_tools: list[str] = None, custom_tools: lis
             "3. Use `action='key', keys='cmd+s'` or `keys='enter'` for keyboard shortcuts.\n"
             "4. Supported actions: capture, click, double_click, right_click, drag, scroll, type, key, wait, list_apps, focus_app."
         )
+
+    lines.append(
+        "\n### CODE STUDIO (MONACO EDITOR) INTEGRATION - MANDATORY DIRECTIVES:\n"
+        "Songbird includes a built-in split-screen Code Studio (Monaco Editor IDE) beside the chat.\n"
+        "When the user asks you to:\n"
+        "- 'use the code studio to write ...'\n"
+        "- 'write hello in code studio'\n"
+        "- 'write code', 'create a file', 'write a script', 'solve in code studio'\n"
+        "- or any request to write, build, or demonstrate code in Agent Mode:\n\n"
+        "DO NOT JUST OUTPUT RAW CODE BLOCKS IN CHAT TEXT! You MUST directly control the Code Studio by issuing a <tool_call>:\n\n"
+        "Example 1: When asked to write code or create a file in Code Studio:\n"
+        "<tool_call>\n"
+        '{"name": "editor_write_file", "arguments": {"file_path": "hello.py", "content": "print(\'Hello from Songbird Code Studio!\')\\n"}}\n'
+        "</tool_call>\n\n"
+        "Example 2: To execute the code in Code Studio and stream terminal logs:\n"
+        "<tool_call>\n"
+        '{"name": "editor_run", "arguments": {"file_path": "hello.py", "language": "python"}}\n'
+        "</tool_call>\n\n"
+        "Example 3: To display a scratch buffer or algorithm without saving to disk:\n"
+        "<tool_call>\n"
+        '{"name": "editor_show_code", "arguments": {"code": "print(\'Hello World\')", "language": "python", "title": "hello.py"}}\n'
+        "</tool_call>\n\n"
+        "Calling these tools automatically opens the split-screen Code Studio, creates the file tab, applies syntax highlighting, and streams terminal execution on the user's screen in real time."
+    )
 
     lines.append(
         "\nTOOL CALL FORMAT:\n"
@@ -232,16 +289,45 @@ def normalize_model_id(raw_model: str, provider: str) -> str:
     return cleaned
 
 def parse_tool_call(raw_call: str) -> tuple[str, dict]:
-    """Robust parser for both JSON and XML tool call formats."""
+    """Robust parser for JSON, XML, pythonic, function-style, and multi-line tool calls."""
     raw_call = raw_call.strip()
+    if not raw_call:
+        return "unknown", {}
 
+    # 1. Direct JSON parse
     try:
         data = json.loads(raw_call)
         if isinstance(data, dict):
-            return data.get("name", "unknown"), data.get("arguments", {})
+            if "name" in data:
+                args = data.get("arguments", {})
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except Exception:
+                        pass
+                return data["name"], args if isinstance(args, dict) else {}
+            if "tool" in data:
+                return data["tool"], data.get("parameters", data.get("arguments", {}))
     except Exception:
         pass
 
+    # 2. Extract JSON object from raw_call
+    json_match = re.search(r"(\{\s*\"(?:name|tool)\"\s*:\s*\"[^\"]+\".*?\})", raw_call, re.DOTALL)
+    if json_match:
+        try:
+            data = json.loads(json_match.group(1))
+            name = data.get("name") or data.get("tool")
+            args = data.get("arguments") or data.get("parameters") or {}
+            if isinstance(args, str):
+                try:
+                    args = json.loads(args)
+                except Exception:
+                    pass
+            return name, args if isinstance(args, dict) else {}
+        except Exception:
+            pass
+
+    # 3. Handle XML format: <arg_key>...</arg_key>
     keys = re.findall(r"<arg_key>(.*?)</arg_key>", raw_call, re.DOTALL)
     values = re.findall(r"<arg_value>(.*?)</arg_value>", raw_call, re.DOTALL)
     if keys and values:
@@ -251,6 +337,46 @@ def parse_tool_call(raw_call: str) -> tuple[str, dict]:
         for k, v in zip(keys, values):
             args[k.strip()] = v.strip()
         return tool_name, args
+
+    # 4. Handle XML tag style: <tool_name> or <file_path>
+    tag_matches = re.findall(r"<([a-zA-Z_0-9]+)>(.*?)</\1>", raw_call, re.DOTALL)
+    if tag_matches:
+        parsed_dict = {k: v.strip() for k, v in tag_matches}
+        tool_name = parsed_dict.pop("name", parsed_dict.pop("tool", None))
+        if tool_name:
+            return tool_name, parsed_dict
+
+    # 5. Check if first line or string starts with a known tool name
+    KNOWN_TOOLS = [
+        "editor_write_file", "editor_open_file", "editor_show_code", "editor_run",
+        "write_file", "read_file", "execute_python", "execute_command", "list_directory",
+        "web_search", "process_document", "vision_analyze"
+    ]
+    for kt in KNOWN_TOOLS:
+        if raw_call.startswith(kt) or f"{kt}\n" in raw_call or f"{kt}:" in raw_call or f"{kt}(" in raw_call:
+            # Check for JSON in the rest
+            rest_json = re.search(r"(\{.*?\})", raw_call, re.DOTALL)
+            if rest_json:
+                try:
+                    args = json.loads(rest_json.group(1))
+                    if isinstance(args, dict):
+                        return kt, args
+                except Exception:
+                    pass
+
+            # Check for Python function call args: file_path="...", content="..."
+            kwarg_matches = re.findall(r'(\w+)\s*=\s*(?:"""(.*?)"""|\'\'\'(.*?)\'\'\'|"([^"\\]*(?:\\.[^"\\]*)*)"|\'([^\'\\]*(?:\\.[^\'\\]*)*)\'|(\[[^\]]*\]|\{[^\}]*\}|[^\s,)]+))', raw_call, re.DOTALL)
+            if kwarg_matches:
+                args = {}
+                for k, tq1, tq2, dq, sq, raw_val in kwarg_matches:
+                    val = tq1 or tq2 or dq or sq or raw_val
+                    args[k] = val
+                return kt, args
+
+            # If tool is write_file or editor_write_file and raw code is present
+            code_fence = re.search(r"```(?:\w+)?\n?(.*?)\n?```", raw_call, re.DOTALL)
+            if code_fence:
+                return kt, {"file_path": "hello.py", "content": code_fence.group(1)}
 
     lines = [l.strip() for l in raw_call.split("\n") if l.strip()]
     if lines:
@@ -669,8 +795,8 @@ async def tool_web_search(query: str) -> str:
     except Exception as e:
         return f"[Search error]: {str(e)}"
 
-async def execute_agent_tool(tool_name: str, args: dict, api_key: str = "", base_url: str = "", custom_tools: list[dict] = None) -> tuple[str, str | None]:
-    """Dispatch tool call to Custom Tools, Songbird Handlers, or Hermes Registry (computer_use, etc.)."""
+async def execute_agent_tool(tool_name: str, args: dict, api_key: str = "", base_url: str = "", custom_tools: list[dict] = None, websocket = None) -> tuple[str, str | None]:
+    """Dispatch tool call to Custom Tools, Songbird Handlers, Code Studio IDE, or Hermes Registry."""
     name = tool_name.strip()
     name_lower = name.lower()
 
@@ -695,8 +821,154 @@ async def execute_agent_tool(tool_name: str, args: dict, api_key: str = "", base
                     directive = ct.get("promptDirective", "")
                     return f"[Custom Tool Directive '{name}']:\n{directive}\nArguments: {json.dumps(args)}", None
 
-    # 2. Check Songbird Built-in Tools
-    if "document" in name_lower or name_lower == "process_document":
+    # 2. Check Songbird Built-in Tools & Code Studio Handlers
+    if name_lower in ("editor_open_file", "editor_open"):
+        fp = args.get("file_path") or args.get("path") or ""
+        resolved = os.path.abspath(os.path.join(WORKSPACE_DIR, fp)) if not os.path.isabs(fp) else fp
+        if not os.path.exists(resolved):
+            return f"[Error: File not found at '{fp}']", None
+        rel_path = os.path.relpath(resolved, WORKSPACE_DIR).replace("\\", "/")
+        try:
+            with open(resolved, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+        except Exception as e:
+            return f"[Error reading file '{fp}']: {str(e)}", None
+        
+        lang = get_language_from_filename(rel_path)
+        if websocket:
+            try:
+                await websocket.send(json.dumps({
+                    "type": "editor_agent_sync",
+                    "action": "open",
+                    "file_path": rel_path,
+                    "content": content,
+                    "language": lang
+                }))
+            except Exception:
+                pass
+        return f"Successfully opened '{rel_path}' in Code Studio for user ({len(content)} chars).", None
+
+    elif name_lower in ("editor_write_file", "editor_save_file", "editor_write"):
+        fp = args.get("file_path") or args.get("path") or "output.txt"
+        cnt = args.get("content") or args.get("text") or args.get("code") or ""
+        out = await tool_write_file(fp, cnt)
+        resolved = os.path.abspath(os.path.join(WORKSPACE_DIR, fp)) if not os.path.isabs(fp) else fp
+        rel_path = os.path.relpath(resolved, WORKSPACE_DIR).replace("\\", "/")
+        lang = get_language_from_filename(rel_path)
+        if websocket:
+            try:
+                await websocket.send(json.dumps({
+                    "type": "editor_agent_sync",
+                    "action": "write",
+                    "file_path": rel_path,
+                    "content": cnt,
+                    "language": lang
+                }))
+            except Exception:
+                pass
+        return f"{out} (Displayed and focused in Code Studio IDE)", None
+
+    elif name_lower in ("editor_show_code", "editor_display_code"):
+        code = args.get("code") or args.get("content") or ""
+        title = args.get("title") or args.get("name") or f"snippet_{int(time.time())}.py"
+        lang = args.get("language") or get_language_from_filename(title)
+        if websocket:
+            try:
+                await websocket.send(json.dumps({
+                    "type": "editor_agent_sync",
+                    "action": "show",
+                    "file_path": title,
+                    "content": code,
+                    "language": lang
+                }))
+            except Exception:
+                pass
+        return f"Displayed code in Code Studio tab '{title}' ({len(code)} chars, {lang}).", None
+
+    elif name_lower in ("editor_run", "editor_run_code", "run_code"):
+        code = args.get("code") or args.get("script") or ""
+        fp = args.get("file_path") or args.get("path") or ""
+        lang = (args.get("language") or "python").lower()
+        if fp and not code:
+            resolved = os.path.abspath(os.path.join(WORKSPACE_DIR, fp)) if not os.path.isabs(fp) else fp
+            if os.path.exists(resolved):
+                with open(resolved, "r", encoding="utf-8", errors="ignore") as f:
+                    code = f.read()
+                lang = get_language_from_filename(fp)
+
+        run_id = f"agent_run_{int(time.time()*1000)}"
+        t_start = time.perf_counter()
+        temp_file = None
+        try:
+            if lang in ["python", "py"] or fp.endswith(".py"):
+                python_exe = os.path.join(WORKSPACE_DIR, "engine", "hermes-agent", "venv", "Scripts", "python.exe")
+                if not os.path.exists(python_exe):
+                    python_exe = sys.executable
+                temp_file = os.path.join(WORKSPACE_DIR, f".songbird_agent_run_{int(time.time())}.py")
+                with open(temp_file, "w", encoding="utf-8") as tf:
+                    tf.write(code)
+                cmd = [python_exe, "-u", temp_file]
+            elif lang in ["javascript", "js", "typescript", "ts"] or fp.endswith(".js") or fp.endswith(".ts"):
+                temp_file = os.path.join(WORKSPACE_DIR, f".songbird_agent_run_{int(time.time())}.js")
+                with open(temp_file, "w", encoding="utf-8") as tf:
+                    tf.write(code)
+                cmd = ["node", temp_file]
+            else:
+                cmd = ["powershell", "-NoProfile", "-Command", code]
+
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=WORKSPACE_DIR
+            )
+
+            outputs = []
+            async def stream_pipe(stream, stream_name):
+                while True:
+                    line = await stream.readline()
+                    if not line:
+                        break
+                    text = line.decode("utf-8", errors="replace")
+                    outputs.append(text)
+                    if websocket:
+                        try:
+                            await websocket.send(json.dumps({
+                                "type": "editor_run_output",
+                                "run_id": run_id,
+                                "stream": stream_name,
+                                "text": text
+                            }))
+                        except Exception:
+                            pass
+
+            await asyncio.gather(
+                stream_pipe(proc.stdout, "stdout"),
+                stream_pipe(proc.stderr, "stderr")
+            )
+            exit_code = await proc.wait()
+            elapsed = round((time.perf_counter() - t_start) * 1000, 2)
+            if websocket:
+                try:
+                    await websocket.send(json.dumps({
+                        "type": "editor_run_done",
+                        "run_id": run_id,
+                        "exit_code": exit_code,
+                        "duration_ms": elapsed
+                    }))
+                except Exception:
+                    pass
+
+            full_res = "".join(outputs).strip() or "[Execution completed with 0 output]"
+            return f"[Code Studio Exit Code {exit_code}, Duration: {elapsed}ms]:\n{full_res}", None
+        finally:
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except Exception:
+                    pass
+
+    elif "document" in name_lower or name_lower == "process_document":
         fp = args.get("file_path") or args.get("path") or ""
         out = await tool_process_document(fp, api_key=api_key, base_url=base_url)
         return out, None
@@ -708,6 +980,17 @@ async def execute_agent_tool(tool_name: str, args: dict, api_key: str = "", base
     elif name_lower == "execute_python":
         code = args.get("code") or args.get("script") or ""
         out = await tool_execute_python(code)
+        # Also broadcast output to Code Studio terminal if open
+        if websocket:
+            try:
+                await websocket.send(json.dumps({
+                    "type": "editor_run_output",
+                    "run_id": f"py_{int(time.time()*1000)}",
+                    "stream": "stdout",
+                    "text": out + "\n"
+                }))
+            except Exception:
+                pass
         return out, None
     elif name_lower == "execute_command":
         cmd = args.get("command") or args.get("cmd") or ""
@@ -717,6 +1000,20 @@ async def execute_agent_tool(tool_name: str, args: dict, api_key: str = "", base
         fp = args.get("file_path") or args.get("path") or "output.txt"
         cnt = args.get("content") or args.get("text") or ""
         out = await tool_write_file(fp, cnt)
+        resolved = os.path.abspath(os.path.join(WORKSPACE_DIR, fp)) if not os.path.isabs(fp) else fp
+        rel_path = os.path.relpath(resolved, WORKSPACE_DIR).replace("\\", "/")
+        lang = get_language_from_filename(rel_path)
+        if websocket:
+            try:
+                await websocket.send(json.dumps({
+                    "type": "editor_agent_sync",
+                    "action": "write",
+                    "file_path": rel_path,
+                    "content": cnt,
+                    "language": lang
+                }))
+            except Exception:
+                pass
         return out, None
     elif name_lower == "read_file":
         fp = args.get("file_path") or args.get("path") or ""
@@ -869,7 +1166,17 @@ async def run_hermes_agent_loop(websocket, messages: list[dict], raw_model_name:
     model_name = normalize_model_id(raw_model_name, "openrouter" if "openrouter" in base_url else "other")
     
     system_prompt = custom_agent_prompt if custom_agent_prompt else AGENT_BASE_PROMPT
-    agent_messages = [{"role": "system", "content": system_prompt}] + [m for m in messages if m.get("role") != "system"]
+    user_msgs = [m for m in messages if m.get("role") != "system"]
+    last_user_prompt = str(user_msgs[-1].get("content", "")).lower() if user_msgs else ""
+    if any(kw in last_user_prompt for kw in ["code studio", "studio", "monaco", "editor", "create file", "write hello", "write code"]):
+        system_prompt += (
+            "\n\n[DIRECT USER DIRECTIVE FOR THIS TURN]:\n"
+            "The user explicitly requested to use Code Studio or create/write code. "
+            "You MUST call `editor_write_file` or `editor_show_code` to create/display the code in Code Studio. "
+            "Do NOT output plain conversational code blocks in chat. You must take control of the Code Studio by issuing the tool call now."
+        )
+
+    agent_messages = [{"role": "system", "content": system_prompt}] + user_msgs
 
     # Initial Progress Broadcast
     await websocket.send(json.dumps({
@@ -913,6 +1220,16 @@ async def run_hermes_agent_loop(websocket, messages: list[dict], raw_model_name:
         # Check for <tool_call> blocks
         tool_matches = re.findall(r"<tool_call>(.*?)</tool_call>", full_response, re.DOTALL)
         if not tool_matches:
+            # Fallback 1: Unclosed <tool_call>
+            unclosed_match = re.search(r"<tool_call>(.*)", full_response, re.DOTALL)
+            if unclosed_match and ("name" in unclosed_match.group(1) or "editor_" in unclosed_match.group(1)):
+                tool_matches = [unclosed_match.group(1)]
+            else:
+                # Fallback 2: JSON in markdown code fence
+                json_fence = re.search(r"```(?:json)?\s*(\{\s*\"name\"\s*:\s*\"[^\"]+\".*?\})\s*```", full_response, re.DOTALL)
+                if json_fence:
+                    tool_matches = [json_fence.group(1)]
+        if not tool_matches:
             # No tool call, finalize task
             await websocket.send(json.dumps({
                 "type": "agent_progress",
@@ -953,7 +1270,9 @@ async def run_hermes_agent_loop(websocket, messages: list[dict], raw_model_name:
             tool_label = "Executing Python data pipeline..."
         elif "command" in tool_name or tool_name == "terminal":
             tool_label = f"Running command: {tool_args.get('command', tool_args.get('cmd', ''))[:35]}..."
-        elif tool_name == "computer_use":
+        elif "editor" in tool_name:
+            tool_label = f"Code Studio: {tool_name.replace('editor_', '')} ({tool_args.get('file_path', tool_args.get('title', 'code'))})"
+        elif "computer_use" in tool_name:
             tool_label = f"Computer Use: {tool_args.get('action', 'capture')}..."
         else:
             tool_label = f"Executing {tool_name}..."
@@ -988,7 +1307,8 @@ async def run_hermes_agent_loop(websocket, messages: list[dict], raw_model_name:
             tool_args,
             api_key=api_key,
             base_url=base_url,
-            custom_tools=custom_tools
+            custom_tools=custom_tools,
+            websocket=websocket
         )
 
         # Notify client of tool result
@@ -1419,6 +1739,207 @@ async def handle_client(websocket):
                         "type": "voice_error",
                         "error": str(e)
                     }))
+                continue
+
+            # ==================== CODE EDITOR STUDIO ACTIONS ====================
+            if action == "editor_list_files":
+                try:
+                    def build_tree(current_dir, rel_base="", depth=0):
+                        if depth > 4:
+                            return []
+                        entries = []
+                        IGNORED = {".git", "node_modules", "venv", "__pycache__", ".pnpm-store", "dist", "target", "debug", "uploads", ".vite", ".vite-temp"}
+                        try:
+                            items = sorted(os.listdir(current_dir), key=lambda x: (not os.path.isdir(os.path.join(current_dir, x)), x.lower()))
+                            for item in items:
+                                if item in IGNORED or item.startswith("."):
+                                    continue
+                                full_p = os.path.join(current_dir, item)
+                                rel_p = os.path.join(rel_base, item).replace("\\", "/")
+                                is_dir = os.path.isdir(full_p)
+                                entry = {
+                                    "name": item,
+                                    "path": rel_p,
+                                    "is_dir": is_dir
+                                }
+                                if is_dir:
+                                    entry["children"] = build_tree(full_p, rel_p, depth + 1)
+                                entries.append(entry)
+                        except Exception:
+                            pass
+                        return entries
+
+                    file_tree = build_tree(WORKSPACE_DIR)
+                    await websocket.send(json.dumps({
+                        "type": "editor_list_files_result",
+                        "tree": file_tree,
+                        "workspace": WORKSPACE_DIR
+                    }))
+                except Exception as e:
+                    await websocket.send(json.dumps({
+                        "type": "editor_list_files_result",
+                        "tree": [],
+                        "error": str(e)
+                    }))
+                continue
+
+            if action == "editor_read_file":
+                rel_path = data.get("file_path", "")
+                try:
+                    full_p = os.path.abspath(os.path.join(WORKSPACE_DIR, rel_path))
+                    if not full_p.startswith(WORKSPACE_DIR):
+                        raise PermissionError("Access outside workspace is prohibited")
+                    if not os.path.exists(full_p):
+                        raise FileNotFoundError(f"File not found: {rel_path}")
+                    with open(full_p, "r", encoding="utf-8", errors="replace") as f:
+                        content = f.read()
+                    await websocket.send(json.dumps({
+                        "type": "editor_read_file_result",
+                        "file_path": rel_path.replace("\\", "/"),
+                        "content": content,
+                        "success": True
+                    }))
+                except Exception as e:
+                    await websocket.send(json.dumps({
+                        "type": "editor_read_file_result",
+                        "file_path": rel_path,
+                        "content": "",
+                        "error": str(e),
+                        "success": False
+                    }))
+                continue
+
+            if action == "editor_save_file":
+                rel_path = data.get("file_path", "")
+                content = data.get("content", "")
+                try:
+                    full_p = os.path.abspath(os.path.join(WORKSPACE_DIR, rel_path))
+                    if not full_p.startswith(WORKSPACE_DIR):
+                        raise PermissionError("Access outside workspace is prohibited")
+                    os.makedirs(os.path.dirname(full_p), exist_ok=True)
+                    with open(full_p, "w", encoding="utf-8") as f:
+                        f.write(content)
+                    await websocket.send(json.dumps({
+                        "type": "editor_save_file_result",
+                        "file_path": rel_path.replace("\\", "/"),
+                        "success": True
+                    }))
+                except Exception as e:
+                    await websocket.send(json.dumps({
+                        "type": "editor_save_file_result",
+                        "file_path": rel_path,
+                        "error": str(e),
+                        "success": False
+                    }))
+                continue
+
+            if action == "editor_create_file":
+                rel_path = data.get("file_path", "")
+                is_dir = bool(data.get("is_dir", False))
+                try:
+                    full_p = os.path.abspath(os.path.join(WORKSPACE_DIR, rel_path))
+                    if not full_p.startswith(WORKSPACE_DIR):
+                        raise PermissionError("Access outside workspace is prohibited")
+                    if is_dir:
+                        os.makedirs(full_p, exist_ok=True)
+                    else:
+                        os.makedirs(os.path.dirname(full_p), exist_ok=True)
+                        if not os.path.exists(full_p):
+                            with open(full_p, "w", encoding="utf-8") as f:
+                                f.write("")
+                    await websocket.send(json.dumps({
+                        "type": "editor_create_file_result",
+                        "file_path": rel_path.replace("\\", "/"),
+                        "is_dir": is_dir,
+                        "success": True
+                    }))
+                except Exception as e:
+                    await websocket.send(json.dumps({
+                        "type": "editor_create_file_result",
+                        "file_path": rel_path,
+                        "error": str(e),
+                        "success": False
+                    }))
+                continue
+
+            if action == "editor_run_code":
+                code = data.get("code", "")
+                lang = (data.get("language") or "python").lower()
+                rel_path = data.get("file_path", "temp_script")
+                run_id = data.get("run_id", f"run_{int(time.time()*1000)}")
+                t_start = time.perf_counter()
+
+                temp_file = None
+                cmd = []
+                try:
+                    if lang in ["python", "py"] or rel_path.endswith(".py"):
+                        python_exe = os.path.join(WORKSPACE_DIR, "engine", "hermes-agent", "venv", "Scripts", "python.exe")
+                        if not os.path.exists(python_exe):
+                            python_exe = sys.executable
+                        temp_file = os.path.join(WORKSPACE_DIR, f".songbird_run_{int(time.time())}.py")
+                        with open(temp_file, "w", encoding="utf-8") as tf:
+                            tf.write(code)
+                        cmd = [python_exe, "-u", temp_file]
+                    elif lang in ["javascript", "js", "typescript", "ts"] or rel_path.endswith(".js") or rel_path.endswith(".ts"):
+                        temp_file = os.path.join(WORKSPACE_DIR, f".songbird_run_{int(time.time())}.js")
+                        with open(temp_file, "w", encoding="utf-8") as tf:
+                            tf.write(code)
+                        cmd = ["node", temp_file]
+                    else:
+                        # PowerShell command
+                        cmd = ["powershell", "-NoProfile", "-Command", code]
+
+                    proc = await asyncio.create_subprocess_exec(
+                        *cmd,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                        cwd=WORKSPACE_DIR
+                    )
+
+                    async def stream_pipe(stream, stream_name):
+                        while True:
+                            line = await stream.readline()
+                            if not line:
+                                break
+                            text = line.decode("utf-8", errors="replace")
+                            await websocket.send(json.dumps({
+                                "type": "editor_run_output",
+                                "run_id": run_id,
+                                "stream": stream_name,
+                                "text": text
+                            }))
+
+                    await asyncio.gather(
+                        stream_pipe(proc.stdout, "stdout"),
+                        stream_pipe(proc.stderr, "stderr")
+                    )
+                    exit_code = await proc.wait()
+                    elapsed = round((time.perf_counter() - t_start) * 1000, 2)
+                    await websocket.send(json.dumps({
+                        "type": "editor_run_done",
+                        "run_id": run_id,
+                        "exit_code": exit_code,
+                        "duration_ms": elapsed
+                    }))
+                except Exception as e:
+                    await websocket.send(json.dumps({
+                        "type": "editor_run_output",
+                        "run_id": run_id,
+                        "stream": "stderr",
+                        "text": f"Execution Error: {str(e)}\n"
+                    }))
+                    await websocket.send(json.dumps({
+                        "type": "editor_run_done",
+                        "run_id": run_id,
+                        "exit_code": 1,
+                        "duration_ms": 0
+                    }))
+                finally:
+                    if temp_file and os.path.exists(temp_file):
+                        try:
+                            os.remove(temp_file)
+                        except Exception:
+                            pass
                 continue
 
             is_agent_mode = bool(data.get("agent_mode", False))

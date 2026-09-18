@@ -36,6 +36,108 @@
     "available": true
   },
   {
+    "id": "editor_open_file",
+    "name": "editor_open_file",
+    "label": "Code Studio: Open File",
+    "category": "Code Execution",
+    "toolset": "songbird",
+    "description": "Open and display any workspace file in the split-screen Code Studio (Monaco Editor) for the user.",
+    "parameters": [
+      {
+        "name": "file_path",
+        "type": "string",
+        "description": "Path to target file in workspace",
+        "required": true
+      }
+    ],
+    "enabled": true,
+    "available": true
+  },
+  {
+    "id": "editor_write_file",
+    "name": "editor_write_file",
+    "label": "Code Studio: Write & Focus File",
+    "category": "Code Execution",
+    "toolset": "songbird",
+    "description": "Create or update a code file, saving it and instantly opening it in the user's Code Studio IDE in real-time.",
+    "parameters": [
+      {
+        "name": "file_path",
+        "type": "string",
+        "description": "Path to file in workspace",
+        "required": true
+      },
+      {
+        "name": "content",
+        "type": "string",
+        "description": "Full file content to write",
+        "required": true
+      }
+    ],
+    "enabled": true,
+    "available": true
+  },
+  {
+    "id": "editor_show_code",
+    "name": "editor_show_code",
+    "label": "Code Studio: Show Code Buffer",
+    "category": "Code Execution",
+    "toolset": "songbird",
+    "description": "Display code, algorithms, or snippets in an active Code Studio tab for the user with syntax highlighting.",
+    "parameters": [
+      {
+        "name": "code",
+        "type": "string",
+        "description": "Code string to display in editor",
+        "required": true
+      },
+      {
+        "name": "language",
+        "type": "string",
+        "description": "Programming language (python, javascript, typescript, etc.)",
+        "required": false
+      },
+      {
+        "name": "title",
+        "type": "string",
+        "description": "Tab title or filename (e.g. solution.py)",
+        "required": false
+      }
+    ],
+    "enabled": true,
+    "available": true
+  },
+  {
+    "id": "editor_run",
+    "name": "editor_run",
+    "label": "Code Studio: Execute in IDE",
+    "category": "Code Execution",
+    "toolset": "songbird",
+    "description": "Execute code inside Code Studio and stream real-time output into the IDE terminal console.",
+    "parameters": [
+      {
+        "name": "code",
+        "type": "string",
+        "description": "Code to execute",
+        "required": false
+      },
+      {
+        "name": "file_path",
+        "type": "string",
+        "description": "Path to script file to execute",
+        "required": false
+      },
+      {
+        "name": "language",
+        "type": "string",
+        "description": "Language: python, javascript, powershell",
+        "required": false
+      }
+    ],
+    "enabled": true,
+    "available": true
+  },
+  {
     "id": "execute_command",
     "name": "execute_command",
     "label": "PowerShell & Shell Runner",
