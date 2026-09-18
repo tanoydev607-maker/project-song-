@@ -42,20 +42,31 @@ import {
   Monitor,
   Target,
   Wrench,
+  Layers,
   X,
 } from "lucide-react";
 import { localTTS } from "@orca/local-tts";
 import { memoryEngine, type ChatMessage, type ChatSession, type ToolExecution, type AttachedFile } from "@orca/memory-engine";
 import { MarkdownRenderer } from "./components/MarkdownRenderer";
-import { ThoughtAccordion } from "./components/ThoughtAccordion";
 import { AgentToolCard } from "./components/AgentToolCard";
-import { SettingsModal, type AIProvider, PROVIDER_CONFIGS } from "./components/SettingsModal";
+import { SettingsModal, type AIProvider, PROVIDER_CONFIGS, type SettingsTab } from "./components/SettingsModal";
 import { SkillsModal, DEFAULT_SKILLS, type AgentSkill } from "./components/SkillsModal";
 import { AgentProgressCard, type AgentProgressState } from "./components/AgentProgressCard";
+import {
+  SongbirdEmblem,
+  NeuralCoreIcon,
+  AgentSparkIcon,
+  McpHubIcon,
+  ToolsWrenchIcon,
+  SettingsDialIcon,
+  OrbIconBadge
+} from "./components/SongbirdIcons";
 import { AttachmentList } from "./components/FileAttachmentPreview";
 import { KokoroVoiceModal } from "./components/KokoroVoiceModal";
 import { ToolsModal, INITIAL_HERMES_TOOLS, type HermesTool } from "./components/ToolsModal";
+import { McpModal, DEFAULT_MCP_PRESETS, type McpServerConfig } from "./components/McpModal";
 import { CodeEditorPanel } from "./components/CodeEditorPanel";
+import { openCodeEditorWindow } from "./utils/windowManager";
 
 const DEFAULT_SYSTEM_PROMPT =
   "You are Songbird, an advanced AI agent specialized in deep reasoning, software architecture, problem-solving, and synthesis. Structure your answers with clear markdown formatting, headings, and syntax-highlighted code blocks.\n\n" +
@@ -108,14 +119,45 @@ export default function App() {
   });
   const [isToolsOpen, setIsToolsOpen] = useState(false);
 
+  // MCP (Model Context Protocol) Server State
+  const [isMcpOpen, setIsMcpOpen] = useState(false);
+  const [isMcpEnabled, setIsMcpEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem("songbird_mcp_enabled");
+    return saved !== null ? saved === "true" : true; // Turned on by default as requested
+  });
+  const [mcpServers, setMcpServers] = useState<McpServerConfig[]>(() => {
+    const saved = localStorage.getItem("songbird_mcp_servers_v1");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        // Fallback
+      }
+    }
+    return DEFAULT_MCP_PRESETS;
+  });
+
   // Attachments State (Draft files for current prompt)
   const [draftAttachments, setDraftAttachments] = useState<AttachedFile[]>([]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [isAttachMenuOpen, setIsAttachMenuOpen] = useState(false);
 
   // Session & Message State
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string>("");
+  const [sessions, setSessions] = useState<ChatSession[]>(() => {
+    try {
+      const loaded = memoryEngine.getSessions();
+      if (loaded && loaded.length > 0) return loaded;
+    } catch {}
+    return [];
+  });
+  const [activeSessionId, setActiveSessionId] = useState<string>(() => {
+    try {
+      return memoryEngine.getActiveSessionId() || "";
+    } catch {
+      return "";
+    }
+  });
   const [input, setInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -133,6 +175,37 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("songbird_code_editor_open", String(isCodeEditorOpen));
   }, [isCodeEditorOpen]);
+
+  // Split View Resizing State (Code Studio on Left + Chatbox on Right)
+  const [editorSplitRatio, setEditorSplitRatio] = useState<number>(() => {
+    const saved = localStorage.getItem("songbird_main_split_ratio");
+    return saved ? parseFloat(saved) : 0.58;
+  });
+  const [isDraggingSplitter, setIsDraggingSplitter] = useState(false);
+  const splitContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleSplitterMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDraggingSplitter(true);
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!splitContainerRef.current) return;
+      const rect = splitContainerRef.current.getBoundingClientRect();
+      const newRatio = (moveEvent.clientX - rect.left) / rect.width;
+      const clamped = Math.max(0.25, Math.min(0.78, newRatio));
+      setEditorSplitRatio(clamped);
+      localStorage.setItem("songbird_main_split_ratio", String(clamped));
+    };
+
+    const onMouseUp = () => {
+      setIsDraggingSplitter(false);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  };
 
   // Provider & API Key State (with LocalStorage persistence)
   const [provider, setProvider] = useState<AIProvider>(() => {
@@ -159,6 +232,7 @@ export default function App() {
   // Settings & Audio State
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
   const [temperature, setTemperature] = useState<number>(0.7);
   const [systemPrompt, setSystemPrompt] = useState<string>(DEFAULT_SYSTEM_PROMPT);
   const [autoTTS, setAutoTTS] = useState(false);
@@ -247,6 +321,22 @@ export default function App() {
     localStorage.setItem("orca_base_url", baseUrl);
     localStorage.setItem("orca_model", selectedModel);
   }, [skills, theme, isAgentMode, provider, apiKey, baseUrl, selectedModel]);
+
+  // Ensure title and favicon are dynamically enforced with new Songbird Beta logo
+  useEffect(() => {
+    document.title = "Songbird Beta";
+    const updateIcon = (rel: string, href: string) => {
+      let el = document.querySelector<HTMLLinkElement>(`link[rel='${rel}']`);
+      if (!el) {
+        el = document.createElement("link");
+        el.rel = rel;
+        document.head.appendChild(el);
+      }
+      el.href = href;
+    };
+    updateIcon("icon", "/favicon.ico?v=3");
+    updateIcon("shortcut icon", "/favicon.ico?v=3");
+  }, []);
 
   // Close attachment dropdown menu on outside click
   useEffect(() => {
@@ -381,7 +471,14 @@ export default function App() {
     }
   }, []);
 
-  const activeSession = sessions.find((s) => s.id === activeSessionId) || sessions[0];
+  const fallbackSession: ChatSession = {
+    id: "default-session",
+    title: "New conversation",
+    messages: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+  const activeSession = sessions.find((s) => s.id === activeSessionId) || sessions[0] || fallbackSession;
   const hasMessages = Boolean(activeSession && activeSession.messages && activeSession.messages.length > 0);
 
   // Auto-scroll (Instant during streaming to prevent visual jitter, smooth otherwise)
@@ -1113,8 +1210,8 @@ export default function App() {
       const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
         : MediaRecorder.isTypeSupported("audio/webm")
-        ? "audio/webm"
-        : "audio/ogg";
+          ? "audio/webm"
+          : "audio/ogg";
       const recorder = new MediaRecorder(mediaStreamRef.current, { mimeType: mime });
       mediaRecorderRef.current = recorder;
 
@@ -1222,7 +1319,7 @@ export default function App() {
         animFrameRef.current = null;
       }
       if (audioContextRef.current) {
-        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current.close().catch(() => { });
         audioContextRef.current = null;
       }
       setMicVolume(0);
@@ -1279,7 +1376,7 @@ export default function App() {
       try {
         readAloudAudioRef.current.pause();
         readAloudAudioRef.current.currentTime = 0;
-      } catch {}
+      } catch { }
       readAloudAudioRef.current = null;
     }
     localTTS.stop();
@@ -1377,7 +1474,7 @@ export default function App() {
     const sessionTitle =
       activeSession?.messages.length === 0
         ? (prompt || draftAttachments[0]?.name || "New Chat").slice(0, 32) +
-          ((prompt || draftAttachments[0]?.name || "").length > 32 ? "..." : "")
+        ((prompt || draftAttachments[0]?.name || "").length > 32 ? "..." : "")
         : activeSession?.title || "New Chat";
 
     const updatedSession: ChatSession = {
@@ -1433,6 +1530,18 @@ export default function App() {
           skills: activeSkills,
           enabled_tools: tools.filter((t) => t.enabled).map((t) => t.name),
           custom_tools: tools.filter((t) => t.isCustom && t.enabled),
+          mcp_servers: isMcpEnabled
+            ? Object.fromEntries(
+              mcpServers
+                .filter((s) => s.enabled)
+                .map((s) => [
+                  s.name,
+                  s.transport === "stdio"
+                    ? { command: s.command || "npx", args: s.args || [], env: s.env || {}, enabled: true }
+                    : { url: s.url || "", transport: s.transport, enabled: true },
+                ])
+            )
+            : {},
           messages: currentMsgs.map((m, idx) => ({
             sender: m.sender,
             content: idx === currentMsgs.length - 1 ? augmentedContent : m.text,
@@ -1546,17 +1655,15 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${activeSession.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_export.md`;
+    a.download = `${(activeSession?.title || "chat").replace(/[^a-z0-9]/gi, "_").toLowerCase()}_export.md`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  // Filtered Sessions
   const filteredSessions = sessions.filter((s) =>
-    s.title.toLowerCase().includes(searchQuery.toLowerCase())
+    (s?.title || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const activeProviderConfig = PROVIDER_CONFIGS[provider] || PROVIDER_CONFIGS.openrouter;
   const isCloudProvider = provider !== "ollama";
   const hasKey = Boolean(apiKey.trim());
   const isDark = theme === "dark";
@@ -1576,9 +1683,8 @@ export default function App() {
         }
       }}
       onDrop={handleDrop}
-      className={`flex h-screen overflow-hidden select-none font-sans transition-colors duration-200 relative ${
-        isDark ? "theme-dark bg-[#212121] text-[#ececec]" : "theme-light bg-[#ffffff] text-[#1c1c1a]"
-      }`}
+      className={`flex h-screen overflow-hidden select-none font-sans transition-colors duration-200 relative ${isDark ? "theme-dark bg-[#212121] text-[#ececec]" : "theme-light bg-[#ffffff] text-[#1c1c1a]"
+        }`}
     >
       {/* Hidden File Inputs */}
       <input
@@ -1599,14 +1705,14 @@ export default function App() {
 
       {/* Full-Screen Drag & Drop Overlay */}
       {isDraggingOver && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/75 backdrop-blur-md border-2 border-dashed border-rose-500 text-white animate-fade-in pointer-events-none">
-          <FileUp size={48} className="text-rose-500 animate-bounce mb-3" />
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md border-2 border-dashed border-white/40 text-white animate-fade-in pointer-events-none">
+          <FileUp size={48} className="text-white animate-bounce mb-3" />
           <h3 className="text-xl font-bold">Drop files or pictures here</h3>
-          <p className="text-xs text-rose-300 mt-1">Images, documents, code files, and datasets supported</p>
+          <p className="text-xs text-zinc-400 mt-1">Images, documents, code files, and datasets supported</p>
         </div>
       )}
 
-      {/* Settings Modal */}
+      {/* Settings Modal (Centralized suite for General, Skills, Tools, MCP, and Voice) */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -1626,77 +1732,50 @@ export default function App() {
         setTemperature={setTemperature}
         autoTTS={autoTTS}
         setAutoTTS={setAutoTTS}
-      />
-
-      {/* Skills Modal (Opened from Sidebar) */}
-      <SkillsModal
-        isOpen={isSkillsOpen}
-        onClose={() => setIsSkillsOpen(false)}
         skills={skills}
         setSkills={setSkills}
-        theme={theme}
-      />
-
-      {/* Kokoro TTS Studio Modal (Voice Selection, Voice Blending & Model Verification) */}
-      <KokoroVoiceModal
-        isOpen={isKokoroModalOpen}
-        onClose={() => setIsKokoroModalOpen(false)}
-        theme={theme}
-        socket={socketRef.current}
+        tools={tools}
+        setTools={setTools}
+        mcpServers={mcpServers}
+        setMcpServers={setMcpServers}
+        isMcpEnabled={isMcpEnabled}
+        setIsMcpEnabled={setIsMcpEnabled}
+        ws={socketRef.current}
         activeVoiceId={activeVoiceId}
         setActiveVoiceId={setActiveVoiceId}
         speechSpeed={speechSpeed}
         setSpeechSpeed={setSpeechSpeed}
-      />
-
-      {/* Hermes Tools & Custom Capabilities Modal */}
-      <ToolsModal
-        isOpen={isToolsOpen}
-        onClose={() => setIsToolsOpen(false)}
-        theme={theme}
-        tools={tools}
-        setTools={setTools}
+        initialTab={settingsTab}
       />
 
       {/* ==================== LEFT SIDEBAR ==================== */}
       <aside
-        className={`${
-          isSidebarOpen ? "w-[260px]" : "w-0"
-        } transition-all duration-200 ease-in-out border-r flex flex-col z-30 overflow-hidden shrink-0 ${
-          isDark ? "bg-[#171717] border-[#282828]" : "bg-[#f9f9f8] border-[#e6e6e0]"
-        }`}
+        className={`${isSidebarOpen ? "w-[260px]" : "w-0"
+          } transition-all duration-200 ease-in-out border-r flex flex-col z-30 overflow-hidden shrink-0 ${isDark ? "bg-[#171717] border-[#282828]" : "bg-[#f9f9f8] border-[#e6e6e0]"
+          }`}
       >
         {/* Brand Header */}
         <div className="px-3.5 pt-3.5 pb-2 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div
-              className={`w-8 h-8 rounded-xl border flex items-center justify-center shadow-sm overflow-hidden select-none p-1 transition ${
-                isDark ? "bg-[#222222] border-[#333333]" : "bg-[#ffffff] border-[#d8d8d0]"
-              }`}
-            >
+            <div className="w-8 h-8 rounded-xl overflow-hidden border border-white/10 shadow-sm shrink-0 bg-white ring-1 ring-white/10">
               <img
-                src={currentLogo}
-                alt="Songbird Logo"
-                className="w-full h-full object-contain"
+                src="/songbird-logo.png"
+                alt="Songbird"
+                className="w-full h-full object-cover select-none"
               />
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-sm tracking-tight flex items-center gap-1.5">
-                Songbird{" "}
-                <span className="text-[10px] px-1 py-0.2 rounded bg-rose-500/20 text-rose-500 border border-rose-500/30">
-                  AI
+                <span className="t-shimmer" data-text="Songbird">Songbird</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/10 text-[var(--sb-text-secondary)] border border-white/10 font-mono font-semibold">
+                  Beta
                 </span>
-              </span>
-              <span className="text-[10px] text-[var(--sb-text-secondary)]">
-                {activeProviderConfig.name}
               </span>
             </div>
           </div>
           <button
             onClick={() => setIsSidebarOpen(false)}
-            className={`p-1 rounded-md transition ${
-              isDark ? "text-[#888888] hover:text-white hover:bg-[#262626]" : "text-[#777777] hover:text-black hover:bg-[#e8e8e2]"
-            }`}
+            className="p-1.5 rounded-lg transition text-[var(--sb-text-muted)] hover:text-[var(--sb-text-primary)] hover:bg-white/5 cursor-pointer"
             title="Close sidebar"
           >
             <PanelLeftClose size={16} />
@@ -1707,21 +1786,15 @@ export default function App() {
         <div className="px-3 py-2">
           <button
             onClick={handleNewChat}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-xs font-medium transition shadow-sm group ${
-              isDark
-                ? "bg-[#212121] hover:bg-[#2b2b2b] border-[#333333] text-white"
-                : "bg-[#ffffff] hover:bg-[#f3f3f0] border-[#d8d8d0] text-[#1c1c1a]"
-            }`}
+            className="w-full orb-pill flex items-center justify-between px-3.5 py-2.5 text-xs font-medium transition group cursor-pointer hover:scale-[1.01]"
           >
-            <div className="flex items-center gap-2">
-              <Plus size={15} className={isDark ? "text-[#a0a0a0] group-hover:text-white" : "text-[#70706a] group-hover:text-black"} />
-              <span>New chat</span>
+            <div className="flex items-center gap-2.5">
+              <OrbIconBadge size="sm" variant="neutral" active={false}>
+                <Plus size={13} className="text-[var(--sb-text-primary)] group-hover:rotate-90 transition-transform duration-200" />
+              </OrbIconBadge>
+              <span className="font-semibold text-[var(--sb-text-primary)]">New chat</span>
             </div>
-            <span
-              className={`text-[10px] px-1.5 py-0.5 rounded border font-mono ${
-                isDark ? "text-[#888888] bg-[#171717] border-[#2b2b2b]" : "text-[#777770] bg-[#f4f4f0] border-[#e0e0d8]"
-              }`}
-            >
+            <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/10 font-mono text-[var(--sb-text-muted)] bg-black/20">
               Ctrl K
             </span>
           </button>
@@ -1729,91 +1802,44 @@ export default function App() {
 
         {/* Mode Toggle (Chat vs Autonomous Agent) */}
         <div className="px-3 py-1">
-          <div
-            className={`flex rounded-xl p-1 border text-xs transition ${
-              isDark ? "bg-[#222222] border-[#333333]" : "bg-[#efefe9] border-[#deded6]"
-            }`}
-          >
+          <div className="flex rounded-xl p-1 border border-[var(--sb-border)] bg-[var(--mock-chat-bg)] text-xs">
             <button
               onClick={() => setIsAgentMode(false)}
-              className={`flex-1 py-1.5 rounded-lg font-medium transition flex items-center justify-center gap-1.5 ${
-                !isAgentMode
-                  ? isDark
-                    ? "bg-[#2f2f2f] text-white shadow-sm"
-                    : "bg-[#ffffff] text-[#1c1c1a] shadow-sm"
-                  : "text-[var(--sb-text-secondary)] hover:text-[var(--sb-text-primary)]"
-              }`}
+              className={`flex-1 py-1.5 rounded-lg font-medium transition flex items-center justify-center gap-1.5 cursor-pointer ${!isAgentMode
+                ? "orb-pill font-semibold text-[var(--sb-text-primary)]"
+                : "text-[var(--sb-text-secondary)] hover:text-[var(--sb-text-primary)]"
+                }`}
             >
               <span>Chat</span>
             </button>
             <button
               onClick={() => setIsAgentMode(true)}
-              className={`flex-1 py-1.5 rounded-lg font-medium transition flex items-center justify-center gap-1.5 ${
-                isAgentMode
-                  ? "bg-rose-600 text-white shadow-sm"
-                  : "text-[var(--sb-text-secondary)] hover:text-[var(--sb-text-primary)]"
-              }`}
+              className={`flex-1 py-1.5 rounded-lg font-medium transition flex items-center justify-center gap-1.5 cursor-pointer ${isAgentMode
+                ? isDark
+                  ? "orb-pill font-semibold text-white border border-white/20"
+                  : "orb-pill font-semibold text-black border border-black/20"
+                : "text-[var(--sb-text-secondary)] hover:text-[var(--sb-text-primary)]"
+                }`}
             >
-              <Bot size={13} />
+              <AgentSparkIcon size={13} glow={isAgentMode} />
               <span>Agent</span>
             </button>
           </div>
         </div>
 
-        {/* Skills Library Button in Sidebar */}
-        <div className="px-3 py-1">
-          <button
-            onClick={() => setIsSkillsOpen(true)}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-xs font-medium transition ${
-              isDark
-                ? "bg-[#222222] hover:bg-[#282828] border-[#333333] text-[#dcdcdc]"
-                : "bg-[#ffffff] hover:bg-[#f4f4f0] border-[#d8d8d0] text-[#333330]"
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Sparkles size={14} className="text-rose-500" />
-              <span>Skills Library</span>
-            </div>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-500/20 text-rose-500 font-mono font-semibold">
-              {activeSkillsCount} Active
-            </span>
-          </button>
-        </div>
 
-        {/* Hermes Tools Window Button in Sidebar */}
-        <div className="px-3 py-1">
-          <button
-            onClick={() => setIsToolsOpen(true)}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-xs font-medium transition ${
-              isDark
-                ? "bg-[#222222] hover:bg-[#282828] border-[#333333] text-[#dcdcdc]"
-                : "bg-[#ffffff] hover:bg-[#f4f4f0] border-[#d8d8d0] text-[#333330]"
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Wrench size={14} className="text-indigo-400" />
-              <span>Hermes Tools</span>
-            </div>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-400 font-mono font-semibold">
-              {activeToolsCount} Active
-            </span>
-          </button>
-        </div>
 
         {/* Code Studio (Monaco Editor) Button in Sidebar */}
         <div className="px-3 py-1">
           <button
             onClick={() => setIsCodeEditorOpen(!isCodeEditorOpen)}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl border text-xs font-medium transition ${
-              isCodeEditorOpen
-                ? "bg-rose-500/15 border-rose-500/40 text-rose-500 shadow-sm"
-                : isDark
-                ? "bg-[#222222] hover:bg-[#282828] border-[#333333] text-[#dcdcdc]"
-                : "bg-[#ffffff] hover:bg-[#f4f4f0] border-[#d8d8d0] text-[#333330]"
-            }`}
+            className="w-full orb-chip flex items-center justify-between px-3 py-2 text-xs font-medium cursor-pointer"
+            title="Toggle Split-Screen Code Studio (Ctrl+Shift+E)"
           >
             <div className="flex items-center gap-2">
-              <Code2 size={14} className="text-rose-500" />
+              <OrbIconBadge size="sm" variant="neutral" active={isCodeEditorOpen}>
+                <Code2 size={13} className="text-[var(--sb-text-primary)]" />
+              </OrbIconBadge>
               <span>Code Studio</span>
             </div>
             <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold text-[var(--sb-text-muted)]">
@@ -1824,20 +1850,14 @@ export default function App() {
 
         {/* Search Chats Input */}
         <div className="px-3 py-1">
-          <div
-            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs ${
-              isDark ? "bg-[#212121] border-[#2d2d2d] text-[#888888]" : "bg-[#ffffff] border-[#d8d8d0] text-[#70706a]"
-            }`}
-          >
-            <Search size={13} />
+          <div className="orb-chip flex items-center gap-2 px-2.5 py-1.5 text-xs">
+            <Search size={13} className="text-[var(--sb-text-muted)]" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search chats..."
-              className={`w-full bg-transparent text-xs placeholder-[#888888] focus:outline-none ${
-                isDark ? "text-[#dcdcdc]" : "text-[#1c1c1a]"
-              }`}
+              className="w-full bg-transparent text-xs text-[var(--sb-text-primary)] placeholder-[var(--sb-text-muted)] focus:outline-none"
             />
           </div>
         </div>
@@ -1852,20 +1872,17 @@ export default function App() {
                 setActiveSessionId(sess.id);
                 memoryEngine.setActiveSessionId(sess.id);
               }}
-              className={`group flex items-center justify-between px-3 py-2 rounded-lg text-xs cursor-pointer transition ${
-                sess.id === activeSessionId
-                  ? isDark
-                    ? "bg-[#2b2b2b] text-white font-medium shadow-sm"
-                    : "bg-[#ebebe5] text-[#1c1c1a] font-medium shadow-sm"
-                  : isDark
-                  ? "hover:bg-[#212121] hover:text-[#e0e0e0]"
-                  : "hover:bg-[#f2f2ee] hover:text-[#1c1c1a]"
-              }`}
+              className={`group flex items-center justify-between px-3 py-2 rounded-xl text-xs cursor-pointer transition ${sess.id === activeSessionId
+                ? "orb-card font-medium text-white shadow-sm"
+                : isDark
+                  ? "hover:bg-white/[0.04] hover:text-[#e0e0e0]"
+                  : "hover:bg-black/[0.04] hover:text-[#1c1c1a]"
+                }`}
             >
               <span className="truncate flex-1">{sess.title || "New Chat"}</span>
               <button
                 onClick={(e) => handleDeleteSession(sess.id, e)}
-                className="opacity-0 group-hover:opacity-100 text-[var(--sb-text-muted)] hover:text-rose-500 p-0.5 transition"
+                className="opacity-0 group-hover:opacity-100 text-[var(--sb-text-muted)] hover:text-[var(--sb-text-primary)] p-0.5 transition"
                 title="Delete chat"
               >
                 <Trash2 size={13} />
@@ -1876,21 +1893,21 @@ export default function App() {
 
         {/* User Profile & Footer Toolbar */}
         <div
-          className={`p-3 border-t flex items-center justify-between text-xs transition ${
-            isDark ? "bg-[#141414] border-[#282828]" : "bg-[#f4f4f2] border-[#e6e6e0]"
-          }`}
+          className={`p-3 border-t flex items-center justify-between text-xs transition ${isDark ? "bg-[#141414] border-[#282828]" : "bg-[#f4f4f2] border-[#e6e6e0]"
+            }`}
         >
           <div className="flex items-center gap-2.5">
-            <div
-              className={`w-7 h-7 rounded-full border flex items-center justify-center text-xs font-semibold ${
-                isDark ? "bg-[#2a2a2a] border-[#383838] text-white" : "bg-[#ffffff] border-[#d4d4cc] text-[#1c1c1a]"
-              }`}
-            >
-              <User size={14} />
+            <div className="w-7 h-7 rounded-lg overflow-hidden border border-white/10 shadow-sm shrink-0 bg-white">
+              <img
+                src="/songbird-logo.png"
+                alt="Songbird"
+                className="w-full h-full object-cover select-none"
+              />
             </div>
             <div className="flex flex-col">
-              <span className="text-xs font-medium">{isAgentMode ? "Hermes Agent" : "Songbird"}</span>
-              <span className="text-[10px] text-[var(--sb-text-muted)]">{activeProviderConfig.name}</span>
+              <span className="text-xs font-semibold text-[var(--sb-text-primary)]">
+                {isAgentMode ? "Hermes Agent" : "Songbird Beta"}
+              </span>
             </div>
           </div>
 
@@ -1898,28 +1915,28 @@ export default function App() {
             {/* Quick 1-Click Theme Toggle Button */}
             <button
               onClick={toggleTheme}
-              className={`p-1.5 rounded-lg transition ${
-                isDark ? "text-[#888888] hover:text-white hover:bg-[#262626]" : "text-[#777777] hover:text-black hover:bg-[#eaeae4]"
-              }`}
+              className={`p-1.5 rounded-lg transition ${isDark ? "text-[#888888] hover:text-white hover:bg-[#262626]" : "text-[#777777] hover:text-black hover:bg-[#eaeae4]"
+                }`}
               title={`Switch to ${isDark ? "Light" : "Dark"} Theme`}
             >
               {isDark ? <Sun size={15} className="text-amber-400" /> : <Moon size={15} className="text-indigo-600" />}
             </button>
 
             <button
-              onClick={() => setIsSettingsOpen(true)}
-              className={`p-1.5 rounded-lg transition ${
-                isDark ? "text-[#888888] hover:text-white hover:bg-[#262626]" : "text-[#777777] hover:text-black hover:bg-[#eaeae4]"
-              }`}
+              onClick={() => {
+                setSettingsTab("general");
+                setIsSettingsOpen(true);
+              }}
+              className={`p-1.5 rounded-lg transition ${isDark ? "text-[#888888] hover:text-white hover:bg-[#262626]" : "text-[#777777] hover:text-black hover:bg-[#eaeae4]"
+                }`}
               title="Configure API Provider & Keys"
             >
               <Sliders size={15} />
             </button>
             <button
               onClick={handleExportMarkdown}
-              className={`p-1.5 rounded-lg transition ${
-                isDark ? "text-[#888888] hover:text-white hover:bg-[#262626]" : "text-[#777777] hover:text-black hover:bg-[#eaeae4]"
-              }`}
+              className={`p-1.5 rounded-lg transition ${isDark ? "text-[#888888] hover:text-white hover:bg-[#262626]" : "text-[#777777] hover:text-black hover:bg-[#eaeae4]"
+                }`}
               title="Export Conversation"
             >
               <Download size={15} />
@@ -1935,917 +1952,653 @@ export default function App() {
       >
         {/* Top Navbar */}
         <header
-          className={`h-13 px-4 flex items-center justify-between border-b z-20 select-none relative transition ${
-            isDark ? "border-[#2b2b2b]/50" : "border-[#e6e6e0]"
-          }`}
+          className={`h-13 px-4 flex items-center justify-between border-b z-20 select-none relative transition ${isDark ? "border-[#2b2b2b]/50" : "border-[#e6e6e0]"
+            }`}
         >
-          <div className="flex items-center gap-2.5">
+          {/* Zone 1: Context (Left) */}
+          <div className="flex items-center gap-2.5 min-w-0">
             {!isSidebarOpen && (
               <button
                 onClick={() => setIsSidebarOpen(true)}
-                className={`p-1.5 rounded-lg transition ${
-                  isDark ? "text-[#888888] hover:text-white hover:bg-[#2a2a2a]" : "text-[#777777] hover:text-black hover:bg-[#ecece6]"
-                }`}
-                title="Open Sidebar"
+                className="p-1.5 rounded-lg text-[var(--sb-text-secondary)] hover:text-[var(--sb-text-primary)] hover:bg-[var(--sb-hover-bg)] transition cursor-pointer"
+                title="Open sidebar"
               >
                 <PanelLeftOpen size={18} />
               </button>
             )}
-
-            {/* Provider & Model Switcher Pill */}
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium transition shadow-sm ${
-                isDark
-                  ? "bg-[#2a2a2a] hover:bg-[#333333] border-[#3a3a3a] text-[#e0e0e0]"
-                  : "bg-[#f4f4f0] hover:bg-[#ebebe5] border-[#d8d8d0] text-[#1c1c1a]"
-              }`}
-            >
-              <img
-                src={currentLogo}
-                alt="Songbird"
-                className="w-4 h-4 object-contain"
-              />
-              <span className="font-semibold">{activeProviderConfig.name}:</span>
-              <span className="text-[var(--sb-text-secondary)] max-w-[140px] truncate">{selectedModel}</span>
-              <Sliders size={12} className="text-[var(--sb-text-muted)] ml-0.5" />
-            </button>
-
-            {/* Agent Mode Indicator Pill */}
-            <button
-              onClick={() => setIsAgentMode(!isAgentMode)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition cursor-pointer ${
-                isAgentMode
-                  ? "bg-rose-500/20 border-rose-500/50 text-rose-500 shadow-sm"
-                  : isDark
-                  ? "bg-[#262626] border-[#383838] text-[#888888] hover:text-white"
-                  : "bg-[#f4f4f0] border-[#d8d8d0] text-[#70706a] hover:text-black"
-              }`}
-            >
-              <Bot size={13} className={isAgentMode ? "text-rose-500 animate-pulse" : ""} />
-              <span>{isAgentMode ? "Hermes Agent Active" : "Standard Chat"}</span>
-            </button>
-
-            {/* Realtime Voice Agent Activation Button (Moonshine Tiny + LLM + Kokoro TTS) */}
-            <button
-              onClick={toggleVoiceAgent}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium border transition cursor-pointer ${
-                isVoiceAgentActive
-                  ? isUserSpeaking
-                    ? "bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-md animate-voice-hearing"
-                    : voiceAgentStatus === "speaking"
-                    ? "bg-rose-500/20 border-rose-500 text-rose-400 shadow-md animate-voice-rose-ripple"
-                    : "bg-rose-500/15 border-rose-500/70 text-rose-500 shadow-md animate-voice-glow"
-                  : isDark
-                  ? "bg-[#262626] border-[#383838] text-[#888888] hover:text-white hover:border-[#555555]"
-                  : "bg-[#f4f4f0] border-[#d8d8d0] text-[#70706a] hover:text-black hover:border-[#b5b5ad]"
-              }`}
-              title={
-                isVoiceAgentActive
-                  ? isUserSpeaking
-                    ? `Hearing your voice! (Volume: ${micVolume}%) - Moonshine Tiny active`
-                    : `Voice Agent Active (${voiceAgentStatus}) - Click to turn OFF`
-                  : "Turn ON Realtime Voice Agent (Moonshine Tiny STT + LLM API + Kokoro TTS)"
-              }
-            >
-              {isVoiceAgentActive ? (
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-0.5 h-3.5 px-0.5">
-                    <span
-                      className={`w-0.5 rounded-full transition-all ${isUserSpeaking ? "bg-emerald-400" : "bg-rose-500 voice-wave-bar-1"}`}
-                      style={isUserSpeaking ? { height: `${Math.max(4, Math.min(18, micVolume * 0.25))}px` } : undefined}
-                    />
-                    <span
-                      className={`w-0.5 rounded-full transition-all ${isUserSpeaking ? "bg-emerald-400" : "bg-rose-500 voice-wave-bar-2"}`}
-                      style={isUserSpeaking ? { height: `${Math.max(6, Math.min(18, micVolume * 0.35))}px` } : undefined}
-                    />
-                    <span
-                      className={`w-0.5 rounded-full transition-all ${isUserSpeaking ? "bg-emerald-400" : "bg-rose-500 voice-wave-bar-3"}`}
-                      style={isUserSpeaking ? { height: `${Math.max(8, Math.min(18, micVolume * 0.3))}px` } : undefined}
-                    />
-                    <span
-                      className={`w-0.5 rounded-full transition-all ${isUserSpeaking ? "bg-emerald-400" : "bg-rose-500 voice-wave-bar-4"}`}
-                      style={isUserSpeaking ? { height: `${Math.max(4, Math.min(18, micVolume * 0.2))}px` } : undefined}
-                    />
-                  </div>
-                  <span className={`font-semibold ${isUserSpeaking ? "text-emerald-400" : "text-rose-500"}`}>
-                    {isUserSpeaking
-                      ? `Hearing You (${micVolume}%)`
-                      : voiceAgentStatus === "speaking"
-                      ? "Speaking..."
-                      : voiceAgentStatus === "processing"
-                      ? "Thinking..."
-                      : "Listening..."}
-                  </span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5">
-                  <Mic size={13} className="text-[var(--sb-text-muted)]" />
-                  <span>Voice Agent</span>
-                </div>
-              )}
-            </button>
-
-            {/* Kokoro TTS Voice Studio & Diagnostic Verification Button */}
-            <button
-              onClick={() => setIsKokoroModalOpen(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition cursor-pointer ${
-                isDark
-                  ? "bg-[#262626] hover:bg-[#303030] border-[#383838] hover:border-amber-500/50 text-[#dcdcd0] hover:text-amber-400"
-                  : "bg-[#f4f4f0] hover:bg-[#eaeae4] border-[#d8d8d0] hover:border-amber-500/50 text-[#60605a] hover:text-black"
-              }`}
-              title="Open Kokoro TTS Studio (Voice Selection, Voice Blending & Model Verification)"
-            >
-              <Sparkles size={13} className="text-amber-400" />
-              <span>Kokoro Studio</span>
-            </button>
-
-            {/* Hermes Tools Studio & Custom Capability Button */}
-            <button
-              onClick={() => setIsToolsOpen(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition cursor-pointer ${
-                isDark
-                  ? "bg-[#262626] hover:bg-[#303030] border-[#383838] hover:border-indigo-500/50 text-[#dcdcd0] hover:text-indigo-300"
-                  : "bg-[#f4f4f0] hover:bg-[#eaeae4] border-[#d8d8d0] hover:border-indigo-500/50 text-[#60605a] hover:text-black"
-              }`}
-              title="Open Hermes Tools & Custom Capabilities Window (80+ tools, schemas, computer_use, and custom runners)"
-            >
-              <Wrench size={13} className="text-indigo-400" />
-              <span>Tools</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-indigo-500/20 text-indigo-400 font-mono font-semibold">
-                {activeToolsCount}
-              </span>
-            </button>
-
-            {/* Code Studio Split View Toggle Button */}
-            <button
-              onClick={() => setIsCodeEditorOpen(!isCodeEditorOpen)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition shadow-sm ${
-                isCodeEditorOpen
-                  ? "bg-rose-500/20 border-rose-500/50 text-rose-500 shadow-rose-500/10"
-                  : isDark
-                  ? "bg-[#212121] border-[#343434] text-[#dcdcdc] hover:border-rose-500/30 hover:text-white"
-                  : "bg-[#ffffff] border-[#d8d8d0] text-[#333330] hover:border-rose-500/30 hover:text-black"
-              }`}
-              title="Toggle Split-Screen Code Studio (Ctrl+Shift+E)"
-            >
-              <Code2 size={13} className="text-rose-500" />
-              <span>Code Studio</span>
-              <span className="text-[10px] px-1 rounded bg-rose-500/20 text-rose-500 font-mono">
-                IDE
-              </span>
-            </button>
+            <span className="text-xs font-medium text-[var(--sb-text-secondary)] truncate max-w-[180px]">
+              {activeSession?.title || "New conversation"}
+            </span>
           </div>
 
-          {/* Right Status Badges */}
-          <div className="flex items-center gap-2.5 text-xs">
-            {/* Quick Theme Switcher Button in Header */}
-            <button
-              onClick={toggleTheme}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium transition ${
-                isDark
-                  ? "bg-[#1b1b1b] border-[#303030] text-amber-400 hover:bg-[#252525]"
-                  : "bg-[#f4f4f0] border-[#dcdcd4] text-indigo-600 hover:bg-[#ebebe4]"
-              }`}
-              title={`Switch to ${isDark ? "Light" : "Dark"} Theme`}
-            >
-              {isDark ? <Sun size={12} /> : <Moon size={12} />}
-              <span>{isDark ? "Dark" : "Light"}</span>
-            </button>
-
-            {/* API Key Status Pill */}
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] border transition ${
-                isCloudProvider
-                  ? hasKey
-                    ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-300"
-                    : "bg-rose-500/15 border-rose-500/30 text-rose-600 dark:text-rose-300 animate-pulse"
-                  : isDark
-                  ? "bg-[#1b1b1b] border-[#303030] text-[#999999]"
-                  : "bg-[#f4f4f0] border-[#d8d8d0] text-[#777770]"
-              }`}
-            >
-              <Key size={11} />
-              <span>{isCloudProvider ? (hasKey ? "Key Connected" : "Key Missing") : "Local Offline"}</span>
-            </button>
-
-            {/* WS Engine Status */}
-            <div
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] ${
-                isDark ? "bg-[#1b1b1b] border-[#303030] text-[#999999]" : "bg-[#f4f4f0] border-[#d8d8d0] text-[#777770]"
-              }`}
-            >
-              <Radio size={11} className={isEngineConnected ? "text-emerald-500 animate-pulse" : "text-rose-500"} />
-              <span>WS :18789</span>
-            </div>
-          </div>
+          {/* Top-Right Spacer */}
+          <div className="w-6" />
 
           {/* ==================== TOP GLOBAL PROGRESS BAR (AGENT MODE ONLY) ==================== */}
           {isAgentMode && isStreaming && (
-            <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-rose-500/15 overflow-hidden z-30">
+            <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/10 overflow-hidden z-30">
               <div
-                className="h-full bg-gradient-to-r from-rose-600 via-rose-500 to-emerald-400 transition-all duration-300 ease-out shadow-sm"
+                className="h-full bg-gradient-to-r from-zinc-500 via-zinc-300 to-white transition-all duration-300 ease-out shadow-sm"
                 style={{ width: `${agentProgress ? Math.max(5, Math.min(agentProgress.percent, 100)) : 100}%` }}
               />
             </div>
           )}
         </header>
 
-        {/* ==================== WORKSPACE SPLIT CONTAINER (CHAT + CODE STUDIO) ==================== */}
-        <div className="flex-1 flex overflow-hidden min-h-0 relative">
-          {/* Left Chat & Input Column */}
+        {/* ==================== WORKSPACE SPLIT CONTAINER (CODE STUDIO ON LEFT + CHATBOX ON RIGHT) ==================== */}
+        <div ref={splitContainerRef} className="flex-1 flex overflow-hidden min-h-0 relative">
+          {/* Left Column: Code Studio Monaco Editor (when open) */}
+          {isCodeEditorOpen && (
+            <div
+              style={{ width: `${editorSplitRatio * 100}%` }}
+              className="h-full flex flex-col min-w-[340px] overflow-hidden border-r border-[var(--sb-border)] transition-[width] duration-75"
+            >
+              <CodeEditorPanel
+                theme={theme}
+                isOpen={isCodeEditorOpen}
+                onClose={() => setIsCodeEditorOpen(false)}
+                ws={socketRef.current}
+                onSendToChat={(prompt) => {
+                  setInput(prompt);
+                  setTimeout(() => textareaRef.current?.focus(), 100);
+                }}
+                externalOpenFile={externalOpenFile}
+                onExternalFileOpened={() => setExternalOpenFile(null)}
+              />
+            </div>
+          )}
+
+          {/* Draggable Resizer Splitter between Code Editor (Left) and Chatbox (Right) */}
+          {isCodeEditorOpen && (
+            <div
+              onMouseDown={handleSplitterMouseDown}
+              onDoubleClick={() => {
+                setEditorSplitRatio(0.58);
+                localStorage.setItem("songbird_main_split_ratio", "0.58");
+              }}
+              className={`w-1.5 hover:w-2 -mx-0.5 relative z-30 cursor-col-resize select-none transition-colors flex items-center justify-center group ${isDraggingSplitter
+                ? "bg-white"
+                : isDark
+                  ? "bg-[#252525] hover:bg-white/30"
+                  : "bg-[#e2e2dc] hover:bg-black/20"
+                }`}
+              title="Drag to resize Code Editor vs Chatbox (Double-click to reset)"
+            >
+              <div className="w-0.5 h-6 rounded-full bg-stone-500/40 group-hover:bg-white" />
+            </div>
+          )}
+
+          {/* Right Column: The Same Songbird Chatbox */}
           <div
-            className={`flex flex-col h-full overflow-hidden transition-all duration-200 ${
-              isCodeEditorOpen ? "w-1/2 min-w-[340px] border-r border-[var(--sb-border)]" : "w-full flex-1"
-            }`}
+            style={isCodeEditorOpen ? { width: `${(1 - editorSplitRatio) * 100}%` } : undefined}
+            className={`flex flex-col h-full overflow-hidden transition-all duration-100 ${isCodeEditorOpen ? "min-w-[340px]" : "w-full flex-1"
+              }`}
           >
             {/* ==================== CENTER CHAT FEED (SCROLLABLE AREA ONLY) ==================== */}
             <main className="flex-1 overflow-y-auto px-4 py-4 flex flex-col items-center">
-          {!hasMessages ? (
-            /* ==================== EMPTY STATE ==================== */
-            <div className="w-full max-w-3xl my-auto flex flex-col items-center justify-center space-y-6 pt-2 animate-fade-in">
-              <div
-                className={`w-24 h-24 rounded-3xl border flex items-center justify-center p-3 shadow-2xl animate-songbird select-none ${
-                  isDark
-                    ? "bg-[#1c1c1c] border-[#333333] shadow-rose-950/40"
-                    : "bg-[#ffffff] border-[#e2e2dc] shadow-rose-500/10"
-                }`}
-              >
-                <img
-                  src={currentLogo}
-                  alt="Songbird Logo"
-                  className="w-full h-full object-contain"
-                />
-              </div>
-
-              <div className="text-center space-y-1.5">
-                <h1 className="text-3xl md:text-4xl font-bold tracking-tight flex items-center justify-center gap-2">
-                  <span>Songbird</span>
-                  {isAgentMode && (
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-500">
-                      Hermes Agent Active
-                    </span>
-                  )}
-                </h1>
-                <p className="text-sm text-[var(--sb-text-secondary)]">
-                  {isAgentMode
-                    ? "Autonomous agent active with Python execution, shell commands, file & picture tools."
-                    : "Conversational intelligence powered by " + activeProviderConfig.name}
-                </p>
-              </div>
-
-              {/* Prompt Suggestion Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl text-left">
-                {(isAgentMode
-                  ? [
-                      {
-                        icon: <Code2 size={16} className="text-emerald-500" />,
-                        title: "Execute Python Script",
-                        desc: "Write a script that benchmarks prime factor calculation & print runtime",
-                        prompt: "Write and execute a Python script to calculate the first 10,000 prime numbers and benchmark execution time.",
-                      },
-                      {
-                        icon: <FileCode size={16} className="text-cyan-500" />,
-                        title: "Analyze & Write Files",
-                        desc: "Inspect the project structure and create a report.json file",
-                        prompt: "List the directory structure and write a summary of this project into a new file called 'project_summary.md'.",
-                      },
-                      {
-                        icon: <Terminal size={16} className="text-amber-500" />,
-                        title: "Run Terminal Diagnostic",
-                        desc: "Run system probe and print active OS environment parameters",
-                        prompt: "Run a system diagnostic command to inspect available memory, disk space, and Python environment.",
-                      },
-                      {
-                        icon: <Globe size={16} className="text-rose-500" />,
-                        title: "Web Research & Synthesize",
-                        desc: "Search for current AI agent benchmarks and summarize takeaways",
-                        prompt: "Search the web for the latest autonomous agent architectures and summarize the core paradigms.",
-                      },
-                    ]
-                  : [
-                      {
-                        icon: <Zap size={16} className="text-rose-500" />,
-                        title: "Architecture Planning",
-                        desc: "Design a high-concurrency event stream system with Rust and React",
-                        prompt: "Design a high-concurrency event streaming architecture with Rust and React.",
-                      },
-                      {
-                        icon: <Code2 size={16} className="text-emerald-500" />,
-                        title: "Python Algorithm",
-                        desc: "Write an async task scheduler with retry & exponential backoff",
-                        prompt: "Write a high-performance Python async task scheduler with exponential backoff and jitter.",
-                      },
-                      {
-                        icon: <Sparkles size={16} className="text-amber-500" />,
-                        title: "Deep Reasoning",
-                        desc: "Explain how autonomous agents evaluate and refine trajectories",
-                        prompt: "Explain how autonomous self-improving agents evaluate and refine execution trajectories.",
-                      },
-                      {
-                        icon: <BookOpen size={16} className="text-cyan-500" />,
-                        title: "Code Refactoring",
-                        desc: "Analyze and suggest optimizations for modern TypeScript interfaces",
-                        prompt: "Analyze and suggest optimizations for modern TypeScript state management and type safety.",
-                      },
-                    ]
-                ).map((card, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSend(card.prompt)}
-                    className={`p-4 rounded-2xl border text-left transition group shadow-sm flex flex-col justify-between min-h-[90px] ${
-                      isDark
-                        ? "bg-[#2a2a2a] hover:bg-[#323232] border-[#383838] hover:border-[#4f4f4f]"
-                        : "bg-[#ffffff] hover:bg-[#f5f5f1] border-[#e2e2dc] hover:border-[#c8c8be]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 font-medium text-xs text-[var(--sb-text-primary)]">
-                      {card.icon}
-                      <span>{card.title}</span>
+              {!hasMessages ? (
+                /* ==================== EMPTY STATE: HERO NEXUS ==================== */
+                <div className="w-full max-w-3xl my-auto flex flex-col items-center justify-center space-y-6 pt-2 animate-fade-in">
+                  {/* Hero Emblem Pedestal */}
+                  <div className="relative flex flex-col items-center">
+                    <div className="orb-pedestal w-24 h-24 rounded-3xl overflow-hidden border border-white/15 shadow-2xl transition-all duration-300 select-none hover:scale-105 bg-white ring-1 ring-white/15">
+                      <img
+                        src="/songbird-logo.png"
+                        alt="Songbird"
+                        className="w-full h-full object-cover select-none"
+                      />
                     </div>
-                    <div className="text-xs text-[var(--sb-text-secondary)] mt-1.5 leading-snug">
-                      {card.desc}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            /* ==================== ACTIVE CONVERSATION FEED ==================== */
-            <div className="w-full max-w-3xl mx-auto space-y-6 pt-6 pb-4">
-              {activeSession.messages.map((msg, idx) => {
-                const isUser = msg.sender === "user";
-                const isSpeaking = speakingMsgId === msg.id;
-                const isCopied = copiedMsgId === msg.id;
+                  </div>
 
-                return (
-                  <div
-                    key={msg.id || idx}
-                    className={`flex gap-4 ${isUser ? "justify-end" : "justify-start"} animate-fade-in`}
-                  >
-                    {!isUser && (
+                  <div className="text-center space-y-2 max-w-lg">
+                    <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-[var(--sb-text-primary)]">
+                      How can Songbird Beta help you today?
+                    </h1>
+                    <p className="text-xs md:text-sm text-[var(--sb-text-secondary)] leading-relaxed">
+                      {isAgentMode
+                        ? "Autonomous agent active with Python script execution, shell diagnostics, and file operations."
+                        : "Conversational intelligence & software architecture powered by Songbird Beta."}
+                    </p>
+                  </div>
+
+                </div>
+              ) : (
+                /* ==================== ACTIVE CONVERSATION FEED ==================== */
+                <div className="w-full max-w-3xl mx-auto space-y-6 pt-6 pb-4">
+                  {activeSession.messages.map((msg, idx) => {
+                    const isUser = msg.sender === "user";
+                    const isSpeaking = speakingMsgId === msg.id;
+                    const isCopied = copiedMsgId === msg.id;
+
+                    return (
                       <div
-                        className={`w-8 h-8 rounded-full border flex items-center justify-center shrink-0 select-none shadow-sm mt-0.5 p-1 overflow-hidden ${
-                          isDark ? "bg-[#1c1c1c] border-[#333333]" : "bg-[#ffffff] border-[#dcdcd4]"
-                        }`}
+                        key={msg.id || idx}
+                        className={`flex gap-4 ${isUser ? "justify-end" : "justify-start"} animate-fade-in`}
                       >
-                        <img
-                          src={currentLogo}
-                          alt="Songbird"
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                    )}
+                        {!isUser && (
+                          <div
+                            className={`w-8 h-8 rounded-full overflow-hidden shrink-0 select-none shadow-md mt-0.5 border border-white/15 bg-white transition-all duration-300 ${isStreaming && idx === activeSession.messages.length - 1
+                                ? "ring-2 ring-white/30 shadow-black/40"
+                                : ""
+                              }`}
+                          >
+                            <img
+                              src="/songbird-logo.png"
+                              alt="Songbird"
+                              className="w-full h-full object-cover select-none"
+                            />
+                          </div>
+                        )}
 
-                    <div
-                      className={`max-w-[85%] text-[15px] leading-relaxed select-text ${
-                        isUser
-                          ? isDark
-                            ? "bg-[#2f2f2f] text-white rounded-3xl px-5 py-3.5 border border-[#3d3d3d] shadow-sm"
-                            : "bg-[#f2f1ee] text-[#1c1c1a] rounded-3xl px-5 py-3.5 border border-[#e2e2dc] shadow-sm"
-                          : "text-[var(--sb-text-primary)] flex-1 pt-0.5"
-                      }`}
-                    >
-                      {/* Attachments Display in Message Bubble */}
-                      {msg.attachments && msg.attachments.length > 0 && (
-                        <AttachmentList files={msg.attachments} />
-                      )}
+                        <div
+                          className={`max-w-[85%] text-[15px] leading-relaxed select-text ${isUser
+                            ? "orb-card px-5 py-3.5 text-[var(--sb-text-primary)] shadow-sm"
+                            : "text-[var(--sb-text-primary)] flex-1 pt-0.5"
+                            }`}
+                        >
+                          {/* Attachments Display in Message Bubble */}
+                          {msg.attachments && msg.attachments.length > 0 && (
+                            <AttachmentList files={msg.attachments} />
+                          )}
 
-                      {/* Thought Accordion */}
-                      {!isUser && msg.thought && (
-                        <ThoughtAccordion
-                          thought={msg.thought}
-                          isThinking={isStreaming && idx === activeSession.messages.length - 1 && !msg.text}
-                        />
-                      )}
+                          {/* Minimal typing dots when waiting for first token */}
+                          {!isUser &&
+                            isStreaming &&
+                            idx === activeSession.messages.length - 1 &&
+                            !msg.text &&
+                            (!msg.toolExecutions || msg.toolExecutions.length === 0) && (
+                              <div className="flex items-center gap-1.5 py-2 px-1 text-[var(--sb-text-muted)] animate-fade-in">
+                                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-pulse" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-pulse [animation-delay:200ms]" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-pulse [animation-delay:400ms]" />
+                              </div>
+                            )}
 
-                      {/* Tool Call Cards for Hermes Agent */}
-                      {!isUser &&
-                        msg.toolExecutions &&
-                        msg.toolExecutions.map((tool) => (
-                          <AgentToolCard key={tool.id} execution={tool} />
-                        ))}
+                          {/* Tool Call Cards for Hermes Agent */}
+                          {!isUser &&
+                            msg.toolExecutions &&
+                            msg.toolExecutions.map((tool) => (
+                              <AgentToolCard key={tool.id} execution={tool} />
+                            ))}
 
-                      {/* Message Text Content */}
-                      {isUser ? (
-                        <div>
-                          {msg.id.startsWith("voice_user_") && (
-                            <div className="mb-1.5 flex items-center gap-1 text-[10px] font-mono font-medium text-rose-500">
-                              <Mic size={11} />
-                              <span>Moonshine Tiny STT</span>
+                          {/* Message Text Content */}
+                          {isUser ? (
+                            <div>
+                              {msg.id.startsWith("voice_user_") && (
+                                <div className="mb-1.5 flex items-center gap-1 text-[10px] font-mono font-medium text-[var(--sb-text-muted)]">
+                                  <Mic size={11} />
+                                  <span>Moonshine Tiny STT</span>
+                                </div>
+                              )}
+                              <div className="whitespace-pre-wrap">{msg.text}</div>
+                            </div>
+                          ) : (
+                            <MarkdownRenderer
+                              content={msg.text}
+                              isStreaming={isStreaming && idx === activeSession.messages.length - 1}
+                              onOpenInEditor={(code, language) => {
+                                setIsCodeEditorOpen(true);
+                                const ext =
+                                  language === "python"
+                                    ? "py"
+                                    : language === "javascript"
+                                      ? "js"
+                                      : language === "typescript"
+                                        ? "ts"
+                                        : "txt";
+                                setExternalOpenFile({
+                                  path: `snippets/snippet_${Date.now()}.${ext}`,
+                                  content: code,
+                                  language,
+                                });
+                              }}
+                            />
+                          )}
+
+                          {/* Assistant Action Toolbar */}
+                          {!isUser && (
+                            <div className="mt-3 flex items-center gap-2.5 text-xs text-[var(--sb-text-muted)] select-none pt-1">
+                              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/[0.06]">{msg.model || selectedModel}</span>
+                              <button
+                                onClick={() => handleCopyMessage(msg)}
+                                className="flex items-center gap-1 hover:text-[var(--sb-text-primary)] transition cursor-pointer"
+                                title="Copy message"
+                              >
+                                {isCopied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+                                <span>{isCopied ? "Copied" : "Copy"}</span>
+                              </button>
+
+                              <button
+                                onClick={() => handleToggleSpeech(msg)}
+                                className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg transition text-xs font-medium border ${isSpeaking
+                                  ? "bg-amber-500/15 border-amber-500/40 text-amber-500 animate-pulse"
+                                  : isDark
+                                    ? "bg-transparent border-transparent hover:bg-[#2e2e2e] text-[var(--sb-text-muted)] hover:text-[var(--sb-text-primary)]"
+                                    : "bg-transparent border-transparent hover:bg-[#eaeae2] text-[var(--sb-text-muted)] hover:text-[var(--sb-text-primary)]"
+                                  }`}
+                                title={
+                                  isSpeaking
+                                    ? "Stop Kokoro Speech"
+                                    : `Read Aloud with Kokoro TTS (${activeVoiceId})`
+                                }
+                              >
+                                {isSpeaking ? (
+                                  isSynthesizingSpeech ? (
+                                    <Loader2 size={13} className="animate-spin text-amber-400" />
+                                  ) : (
+                                    <VolumeX size={13} className="text-amber-500" />
+                                  )
+                                ) : (
+                                  <Volume2 size={13} className="text-amber-500/80 hover:text-amber-400" />
+                                )}
+                                <span>
+                                  {isSpeaking
+                                    ? isSynthesizingSpeech
+                                      ? "Synthesizing..."
+                                      : "Speaking (Kokoro)..."
+                                    : "Read Aloud"}
+                                </span>
+                                <span
+                                  className={`text-[9px] px-1 py-0.2 rounded font-mono uppercase tracking-wider ${isSpeaking
+                                    ? "bg-amber-500 text-black font-semibold"
+                                    : isDark
+                                      ? "bg-[#333333] text-[#aaaaaa]"
+                                      : "bg-[#e2e2da] text-[#666660]"
+                                    }`}
+                                >
+                                  Kokoro
+                                </span>
+                              </button>
                             </div>
                           )}
-                          <div className="whitespace-pre-wrap">{msg.text}</div>
                         </div>
-                      ) : (
-                        <MarkdownRenderer
-                          content={msg.text}
-                          isStreaming={isStreaming && idx === activeSession.messages.length - 1}
-                          onOpenInEditor={(code, language) => {
-                            setIsCodeEditorOpen(true);
-                            const ext =
-                              language === "python"
-                                ? "py"
-                                : language === "javascript"
-                                ? "js"
-                                : language === "typescript"
-                                ? "ts"
-                                : "txt";
-                            setExternalOpenFile({
-                              path: `snippets/snippet_${Date.now()}.${ext}`,
-                              content: code,
-                              language,
-                            });
-                          }}
-                        />
-                      )}
 
-                      {/* Assistant Action Toolbar */}
-                      {!isUser && (
-                        <div className="mt-3 flex items-center gap-3 text-xs text-[var(--sb-text-muted)] select-none pt-1">
-                          <span className="font-mono text-[11px]">{msg.model || selectedModel}</span>
-                          <span>•</span>
-                          <button
-                            onClick={() => handleCopyMessage(msg)}
-                            className="flex items-center gap-1 hover:text-[var(--sb-text-primary)] transition"
-                            title="Copy message"
-                          >
-                            {isCopied ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
-                            <span>{isCopied ? "Copied" : "Copy"}</span>
-                          </button>
-
-                          <button
-                            onClick={() => handleToggleSpeech(msg)}
-                            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-lg transition text-xs font-medium border ${
-                              isSpeaking
-                                ? "bg-amber-500/15 border-amber-500/40 text-amber-500 animate-pulse"
-                                : isDark
-                                ? "bg-transparent border-transparent hover:bg-[#2e2e2e] text-[var(--sb-text-muted)] hover:text-[var(--sb-text-primary)]"
-                                : "bg-transparent border-transparent hover:bg-[#eaeae2] text-[var(--sb-text-muted)] hover:text-[var(--sb-text-primary)]"
-                            }`}
-                            title={
-                              isSpeaking
-                                ? "Stop Kokoro Speech"
-                                : `Read Aloud with Kokoro TTS (${activeVoiceId})`
-                            }
-                          >
-                            {isSpeaking ? (
-                              isSynthesizingSpeech ? (
-                                <Loader2 size={13} className="animate-spin text-amber-500" />
-                              ) : (
-                                <VolumeX size={13} className="text-amber-500" />
-                              )
-                            ) : (
-                              <Volume2 size={13} className="text-amber-500/80 hover:text-amber-400" />
-                            )}
-                            <span>
-                              {isSpeaking
-                                ? isSynthesizingSpeech
-                                  ? "Synthesizing..."
-                                  : "Speaking (Kokoro)..."
-                                : "Read Aloud"}
-                            </span>
-                            <span
-                              className={`text-[9px] px-1 py-0.2 rounded font-mono uppercase tracking-wider ${
-                                isSpeaking
-                                  ? "bg-amber-500 text-black font-semibold"
-                                  : isDark
-                                  ? "bg-[#333333] text-[#aaaaaa]"
-                                  : "bg-[#e2e2da] text-[#666660]"
-                              }`}
-                            >
-                              Kokoro
-                            </span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {isUser && (
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs shrink-0 select-none mt-0.5 border ${
-                          isDark ? "bg-[#383838] border-[#444444] text-[#dcdcdc]" : "bg-[#e8e8e2] border-[#d0d0c8] text-[#555550]"
-                        }`}
-                      >
-                        <User size={15} />
+                        {isUser && (
+                          <OrbIconBadge size="sm" variant="neutral" className="mt-0.5">
+                            <User size={13} />
+                          </OrbIconBadge>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-              <div ref={messagesEndRef} className="h-4 shrink-0" />
-            </div>
-          )}
-        </main>
-
-        {/* ==================== PINNED BOTTOM CHAT BOX CONTAINER (ALWAYS FIXED IN PLACE) ==================== */}
-        <footer className="shrink-0 w-full px-4 pb-3 pt-1.5 z-20 flex flex-col items-center">
-          <div className="w-full max-w-3xl">
-            {/* Live Agent Execution Plan & Progress Card (AGENT MODE ONLY) */}
-            {isAgentMode && isStreaming && agentProgress && (
-              <AgentProgressCard
-                progress={agentProgress}
-                elapsedSeconds={elapsedSeconds}
-                onStop={handleStopGeneration}
-                theme={theme}
-              />
-            )}
-
-            <div
-              className={`rounded-3xl p-3.5 flex flex-col gap-2.5 shadow-xl border transition relative ${
-                isDark
-                  ? isAgentMode
-                    ? "bg-[#2f2f2f] border-rose-900/60 focus-within:border-rose-500 shadow-rose-950/20"
-                    : "bg-[#2f2f2f] border-[#3c3c3c] focus-within:border-[#555555]"
-                  : isAgentMode
-                  ? "bg-[#ffffff] border-rose-400 focus-within:border-rose-500 shadow-rose-500/10"
-                  : "bg-[#ffffff] border-[#dcdcd6] focus-within:border-[#a0a098] shadow-sm"
-              }`}
-            >
-              {/* Draft Attachments Preview inside Composer */}
-              {draftAttachments.length > 0 && (
-                <AttachmentList
-                  files={draftAttachments}
-                  onRemove={handleRemoveDraftAttachment}
-                  isDraft={true}
-                />
-              )}
-
-              {/* Unified Voice Agent Hearing & Heard Status inside Chat Bar */}
-              {(isVoiceAgentActive || sttHeardInfo) && (
-                <div
-                  className={`px-3 py-2 rounded-2xl border flex items-center justify-between gap-3 text-xs animate-fade-in transition shadow-sm ${
-                    isUserSpeaking
-                      ? isDark
-                        ? "bg-emerald-950/40 border-emerald-500/60 text-emerald-300 shadow-emerald-950/20"
-                        : "bg-emerald-50 border-emerald-400 text-emerald-900 shadow-emerald-100"
-                      : sttHeardInfo
-                      ? isDark
-                        ? "bg-[#252525] border-emerald-600/50 text-[#f0f0f0]"
-                        : "bg-emerald-50/90 border-emerald-300 text-[#1a1a1a]"
-                      : voiceAgentStatus === "speaking"
-                      ? isDark
-                        ? "bg-rose-950/30 border-rose-500/50 text-rose-300"
-                        : "bg-rose-50 border-rose-300 text-rose-900"
-                      : isDark
-                      ? "bg-[#242424] border-[#383838] text-[#dcdcdc]"
-                      : "bg-[#f5f5f0] border-[#dcdcd4] text-[#2c2c2a]"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    <div className="relative flex items-center justify-center w-5 h-5 shrink-0">
-                      {isUserSpeaking ? (
-                        <>
-                          <span className="animate-ping absolute inline-flex h-3.5 w-3.5 rounded-full bg-emerald-400 opacity-75"></span>
-                          <Mic size={14} className="text-emerald-400 relative z-10" />
-                        </>
-                      ) : voiceAgentStatus === "speaking" ? (
-                        <AudioLines size={14} className="text-rose-400 animate-pulse relative z-10" />
-                      ) : sttHeardInfo ? (
-                        <Check size={14} strokeWidth={3} className="text-emerald-400 relative z-10" />
-                      ) : (
-                        <Mic size={14} className="text-emerald-400/80 relative z-10" />
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      {sttHeardInfo ? (
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className="text-[10px] font-bold font-mono uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 shrink-0">
-                            Heard
-                          </span>
-                          <span className="font-semibold text-xs truncate" title={sttHeardInfo.text}>
-                            "{sttHeardInfo.text}"
-                          </span>
-                          {sttHeardInfo.latencyMs !== undefined && (
-                            <span className="text-[10px] font-mono text-[var(--sb-text-muted)] shrink-0 hidden sm:inline">
-                              ⚡ {Math.round(sttHeardInfo.latencyMs)}ms
-                            </span>
-                          )}
-                          {sttHeardInfo.device && (
-                            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-400/90 font-mono shrink-0 hidden md:inline">
-                              {sttHeardInfo.device.toUpperCase()}
-                            </span>
-                          )}
-                        </div>
-                      ) : isUserSpeaking ? (
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="font-semibold text-xs text-emerald-400">
-                            Hearing voice...
-                          </span>
-                          <span className="text-[10px] font-mono text-[var(--sb-text-muted)]">
-                            ({micVolume}%)
-                          </span>
-                        </div>
-                      ) : voiceAgentStatus === "speaking" ? (
-                        <span className="font-semibold text-xs text-rose-400">
-                          Voice Agent replying (Kokoro TTS)...
-                        </span>
-                      ) : voiceAgentStatus === "processing" ? (
-                        <span className="font-semibold text-xs text-amber-400 animate-pulse">
-                          Moonshine Tiny transcribing speech...
-                        </span>
-                      ) : (
-                        <div className="flex flex-col min-w-0">
-                          <span className="font-semibold text-[11px] font-mono tracking-wide uppercase text-emerald-400 flex items-center gap-1.5">
-                            Voice Agent Listening
-                            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 font-sans font-medium">
-                              Moonshine Tiny
-                            </span>
-                          </span>
-                          <span className="text-[10px] opacity-75 truncate">
-                            Speak anytime — Transcribes speech to chat bar & answers with voice
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Real-time audio waveform equalizer bars & Dismiss */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-black/10 dark:bg-black/30">
-                      {[14, 28, 55, 75, 48, 24, 62].map((baseHeight, idx) => {
-                        const factor = isUserSpeaking
-                          ? Math.max(0.2, micVolume / 100)
-                          : voiceAgentStatus === "speaking"
-                          ? 0.45
-                          : 0.12;
-                        const barHeight = Math.max(4, Math.round(baseHeight * factor * 0.24));
-                        return (
-                          <span
-                            key={idx}
-                            className={`w-1 rounded-full transition-all duration-75 ${
-                              isUserSpeaking
-                                ? "bg-emerald-400"
-                                : voiceAgentStatus === "speaking"
-                                ? "bg-rose-400"
-                                : "bg-emerald-500/40"
-                            }`}
-                            style={{ height: `${barHeight}px` }}
-                          />
-                        );
-                      })}
-                    </div>
-
-                    {sttHeardInfo && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (input === sttHeardInfo.text) {
-                            setInput("");
-                          }
-                          setSttHeardInfo(null);
-                        }}
-                        className="p-1 rounded-lg text-[var(--sb-text-muted)] hover:text-white transition cursor-pointer"
-                        title="Dismiss heard text"
-                      >
-                        <X size={13} />
-                      </button>
-                    )}
-                  </div>
+                    );
+                  })}
+                  <div ref={messagesEndRef} className="h-4 shrink-0" />
                 </div>
               )}
+            </main>
 
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onPaste={handlePaste}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                rows={1}
-                placeholder={
-                  isVoiceAgentActive
-                    ? isUserSpeaking
-                      ? "Hearing your voice... (Moonshine Tiny STT)"
-                      : sttHeardInfo
-                      ? `Voice heard: "${sttHeardInfo.text}"`
-                      : "Voice Agent listening... Speak anytime"
-                    : isAgentMode
-                    ? "Assign an autonomous task to Hermes Agent (with files & pictures)..."
-                    : `Message ${selectedModel}...`
-                }
-                className={`w-full bg-transparent text-sm md:text-[15px] placeholder-[#888888] px-2 py-1 focus:outline-none resize-none max-h-48 min-h-[38px] leading-relaxed ${
-                  isDark ? "text-[#f0f0f0]" : "text-[#1c1c1a]"
-                }`}
-              />
+            {/* ==================== PINNED BOTTOM CHAT BOX CONTAINER (ALWAYS FIXED IN PLACE) ==================== */}
+            <footer className="shrink-0 w-full px-4 pb-3 pt-1.5 z-20 flex flex-col items-center">
+              <div className="w-full max-w-3xl">
+                {/* Live Agent Execution Plan & Progress Card (AGENT MODE ONLY) */}
+                {isAgentMode && isStreaming && agentProgress && (
+                  <AgentProgressCard
+                    progress={agentProgress}
+                    elapsedSeconds={elapsedSeconds}
+                    onStop={handleStopGeneration}
+                    theme={theme}
+                  />
+                )}
 
-              {/* Bottom Toolbar */}
-              <div className="flex items-center justify-between px-1 pt-1 relative">
-                {/* Left Action Buttons */}
-                <div className="flex items-center gap-2 text-[var(--sb-text-muted)] relative" ref={attachMenuRef}>
-                  {/* File / Photo Attachment Menu Button */}
-                  <button
-                    type="button"
-                    onClick={() => setIsAttachMenuOpen(!isAttachMenuOpen)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition shadow-sm ${
-                      isAttachMenuOpen || draftAttachments.length > 0
-                        ? "bg-rose-500/20 text-rose-500 border-rose-500/50"
-                        : isDark
-                        ? "bg-[#282828] hover:bg-[#333333] border-[#383838] text-[#dcdcdc]"
-                        : "bg-[#f4f4f0] hover:bg-[#ebebe4] border-[#d8d8d0] text-[#1c1c1a]"
+                <div
+                  className={`orb-chat-composer p-4 flex flex-col gap-3 transition-all duration-300 relative ${isAgentMode ? "ring-1 ring-white/20" : ""
                     }`}
-                    title="Attach Photos or Files"
-                  >
-                    <Plus size={15} className={`transition duration-200 ${isAttachMenuOpen ? "rotate-45 text-rose-500" : ""}`} />
-                    <span>Attach</span>
-                    {draftAttachments.length > 0 && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-rose-500 text-white font-mono">
-                        {draftAttachments.length}
-                      </span>
-                    )}
-                  </button>
+                >
+                  {/* Draft Attachments Preview inside Composer */}
+                  {draftAttachments.length > 0 && (
+                    <AttachmentList
+                      files={draftAttachments}
+                      onRemove={handleRemoveDraftAttachment}
+                      isDraft={true}
+                    />
+                  )}
 
-                  {/* Attachment Popover Action Dropdown Menu */}
-                  {isAttachMenuOpen && (
+                  {/* Unified Voice Agent Hearing & Heard Status inside Chat Bar */}
+                  {(isVoiceAgentActive || sttHeardInfo) && (
                     <div
-                      className={`absolute bottom-full left-0 mb-2 w-60 rounded-2xl border shadow-2xl overflow-hidden p-1.5 z-50 animate-fade-in transition font-sans ${
-                        isDark
-                          ? "bg-[#1e1e1e] border-[#383838] text-[#ececec] shadow-black/60"
-                          : "bg-[#ffffff] border-[#dcdcd4] text-[#1c1c1a] shadow-xl"
-                      }`}
+                      className={`px-3 py-2 rounded-2xl border flex items-center justify-between gap-3 text-xs animate-fade-in transition shadow-sm ${isUserSpeaking
+                        ? isDark
+                          ? "bg-emerald-950/40 border-emerald-500/60 text-emerald-300 shadow-emerald-950/20"
+                          : "bg-emerald-50 border-emerald-400 text-emerald-900 shadow-emerald-100"
+                        : sttHeardInfo
+                          ? isDark
+                            ? "bg-[#252525] border-emerald-600/50 text-[#f0f0f0]"
+                            : "bg-emerald-50/90 border-emerald-300 text-[#1a1a1a]"
+                          : voiceAgentStatus === "speaking"
+                            ? isDark
+                              ? "bg-white/10 border-white/20 text-white"
+                              : "bg-black/5 border-black/15 text-black"
+                            : isDark
+                              ? "bg-[#242424] border-[#383838] text-[#dcdcdc]"
+                              : "bg-[#f5f5f0] border-[#dcdcd4] text-[#2c2c2a]"
+                        }`}
                     >
-                      <div className="px-3 py-1.5 text-[10px] uppercase font-semibold tracking-wider text-[var(--sb-text-muted)] border-b border-[var(--sb-border)] mb-1">
-                        Add Attachment
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="relative flex items-center justify-center w-5 h-5 shrink-0">
+                          {isUserSpeaking ? (
+                            <AudioLines size={16} className="text-emerald-400 animate-pulse" />
+                          ) : voiceAgentStatus === "speaking" ? (
+                            <Waves size={16} className="text-[var(--sb-text-primary)] animate-bounce" />
+                          ) : voiceAgentStatus === "processing" ? (
+                            <Loader2 size={16} className="text-amber-400 animate-spin" />
+                          ) : sttHeardInfo ? (
+                            <Check size={14} strokeWidth={3} className="text-emerald-400 relative z-10" />
+                          ) : (
+                            <Mic size={16} className="text-emerald-400" />
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          {sttHeardInfo ? (
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <span className="text-[10px] font-bold font-mono uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 shrink-0">
+                                Heard
+                              </span>
+                              <span className="font-semibold text-xs truncate" title={sttHeardInfo.text}>
+                                "{sttHeardInfo.text}"
+                              </span>
+                              {sttHeardInfo.latencyMs !== undefined && (
+                                <span className="text-[10px] font-mono text-[var(--sb-text-muted)] shrink-0 hidden sm:inline">
+                                  ⚡ {Math.round(sttHeardInfo.latencyMs)}ms
+                                </span>
+                              )}
+                              {sttHeardInfo.device && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-400/90 font-mono shrink-0 hidden md:inline">
+                                  {sttHeardInfo.device.toUpperCase()}
+                                </span>
+                              )}
+                            </div>
+                          ) : isUserSpeaking ? (
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="font-semibold text-xs text-emerald-400">
+                                Hearing voice...
+                              </span>
+                              <span className="text-[10px] font-mono text-[var(--sb-text-muted)]">
+                                ({micVolume}%)
+                              </span>
+                            </div>
+                          ) : voiceAgentStatus === "speaking" ? (
+                            <span className="font-semibold text-xs text-[var(--sb-text-primary)]">
+                              Voice Agent replying (Kokoro TTS)...
+                            </span>
+                          ) : voiceAgentStatus === "processing" ? (
+                            <span className="font-semibold text-xs text-amber-400 animate-pulse">
+                              Moonshine Tiny transcribing speech...
+                            </span>
+                          ) : (
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-semibold text-[11px] font-mono tracking-wide uppercase text-emerald-400 flex items-center gap-1.5">
+                                Voice Agent Listening
+                                <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 font-sans font-medium">
+                                  Moonshine Tiny
+                                </span>
+                              </span>
+                              <span className="text-[10px] opacity-75 truncate">
+                                Speak anytime: transcribes speech to input and responds with voice
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                      {/* 1. Upload Photo / Picture */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          photoInputRef.current?.click();
-                        }}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition group ${
-                          isDark ? "hover:bg-[#2a2a2a]" : "hover:bg-[#f3f3ee]"
-                        }`}
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-500 shrink-0">
-                          <ImageIcon size={16} />
+                      {/* Real-time audio waveform equalizer bars & Dismiss */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-black/10 dark:bg-black/30">
+                          {[14, 28, 55, 75, 48, 24, 62].map((baseHeight, idx) => {
+                            const factor = isUserSpeaking
+                              ? Math.max(0.2, micVolume / 100)
+                              : voiceAgentStatus === "speaking"
+                                ? 0.45
+                                : 0.12;
+                            const barHeight = Math.max(4, Math.round(baseHeight * factor * 0.24));
+                            return (
+                              <span
+                                key={idx}
+                                className={`w-1 rounded-full transition-all duration-75 ${isUserSpeaking
+                                  ? "bg-emerald-400"
+                                  : voiceAgentStatus === "speaking"
+                                    ? "bg-zinc-200 dark:bg-white"
+                                    : "bg-emerald-500/40"
+                                  }`}
+                                style={{ height: `${barHeight}px` }}
+                              />
+                            );
+                          })}
                         </div>
-                        <div className="flex flex-col flex-1 min-w-0">
-                          <span className="text-xs font-semibold">Upload Photo</span>
-                          <span className="text-[10px] text-[var(--sb-text-muted)] truncate">PNG, JPG, WEBP, GIF, SVG</span>
-                        </div>
-                      </button>
 
-                      {/* 2. Upload File / Document / Code */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          fileInputRef.current?.click();
-                        }}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition group ${
-                          isDark ? "hover:bg-[#2a2a2a]" : "hover:bg-[#f3f3ee]"
-                        }`}
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 shrink-0">
-                          <FileText size={16} />
-                        </div>
-                        <div className="flex flex-col flex-1 min-w-0">
-                          <span className="text-xs font-semibold">Upload File / Document</span>
-                          <span className="text-[10px] text-[var(--sb-text-muted)] truncate">PDF, CSV, JSON, TXT, Code</span>
-                        </div>
-                      </button>
-
-                      {/* 3. Capture Screen for Multimodal Analysis */}
-                      <button
-                        type="button"
-                        onClick={handleCaptureScreen}
-                        disabled={isCapturingScreen}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition group ${
-                          isDark ? "hover:bg-[#2a2a2a]" : "hover:bg-[#f3f3ee]"
-                        }`}
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
-                          <Monitor size={16} />
-                        </div>
-                        <div className="flex flex-col flex-1 min-w-0">
-                          <span className="text-xs font-semibold text-cyan-400">Capture Screen</span>
-                          <span className="text-[10px] text-[var(--sb-text-muted)] truncate">
-                            {isCapturingScreen ? "Capturing..." : "Take snapshot for multimodal analysis"}
-                          </span>
-                        </div>
-                      </button>
+                        {sttHeardInfo && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (input === sttHeardInfo.text) {
+                                setInput("");
+                              }
+                              setSttHeardInfo(null);
+                            }}
+                            className="p-1 rounded-lg text-[var(--sb-text-muted)] hover:text-white transition cursor-pointer"
+                            title="Dismiss heard text"
+                          >
+                            <X size={13} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
 
-                  {/* Agent Mode Toggle */}
-                  <button
-                    onClick={() => setIsAgentMode(!isAgentMode)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition ${
-                      isAgentMode
-                        ? "bg-rose-600 text-white shadow-sm"
-                        : isDark
-                        ? "bg-[#282828] hover:bg-[#333333] border-[#383838] text-[#888888] hover:text-white"
-                        : "bg-[#f4f4f0] hover:bg-[#ebebe4] border-[#d8d8d0] text-[#70706a] hover:text-black"
-                    }`}
-                    title="Toggle Autonomous Agent Mode"
-                  >
-                    <Bot size={14} />
-                    <span>Agent Mode</span>
-                  </button>
-
-                  {/* Unified Voice Agent Button (Moonshine STT Dictation + Hermes Reasoning + Kokoro TTS) */}
-                  <button
-                    type="button"
-                    onClick={toggleVoiceAgent}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition cursor-pointer ${
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onPaste={handlePaste}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    rows={1}
+                    placeholder={
                       isVoiceAgentActive
                         ? isUserSpeaking
-                          ? "bg-emerald-500/20 border-emerald-500/70 text-emerald-400 shadow-sm animate-pulse"
-                          : voiceAgentStatus === "speaking"
-                          ? "bg-rose-500/20 border-rose-500/70 text-rose-400 shadow-sm animate-voice-rose-ripple"
-                          : "bg-rose-500/20 border-rose-500/60 text-rose-500 shadow-sm animate-voice-glow"
-                        : isDark
-                        ? "bg-[#282828] hover:bg-[#333333] border-[#383838] text-[#888888] hover:text-white"
-                        : "bg-[#f4f4f0] hover:bg-[#ebebe4] border-[#d8d8d0] text-[#70706a] hover:text-black"
-                    }`}
-                    title={
-                      isVoiceAgentActive
-                        ? "Voice Agent Active: Dictating speech into chat & replying with Kokoro TTS (Click to stop)"
-                        : "Voice Agent (Dictate with Moonshine STT & converse with Kokoro TTS)"
+                          ? "Hearing your voice... (Moonshine Tiny STT)"
+                          : sttHeardInfo
+                            ? `Voice heard: "${sttHeardInfo.text}"`
+                            : "Voice Agent listening... Speak anytime"
+                        : isAgentMode
+                          ? "Assign an autonomous task to Hermes Agent (with files & pictures)..."
+                          : `Message ${selectedModel}...`
                     }
-                  >
-                    {isVoiceAgentActive ? (
-                      <>
-                        <AudioLines size={14} className={isUserSpeaking ? "text-emerald-400" : "text-rose-500"} />
-                        <span>{isUserSpeaking ? "Hearing..." : voiceAgentStatus === "speaking" ? "Speaking..." : "Voice ON"}</span>
-                      </>
-                    ) : (
-                      <>
-                        <Mic size={14} />
-                        <span>Voice Agent</span>
-                      </>
-                    )}
-                  </button>
+                    className={`w-full bg-transparent text-sm md:text-[15px] placeholder-[#888888] px-2 py-1 focus:outline-none resize-none max-h-48 min-h-[38px] leading-relaxed ${isDark ? "text-[#f0f0f0]" : "text-[#1c1c1a]"
+                      }`}
+                  />
+
+                  {/* Bottom Toolbar */}
+                  <div className="flex items-center justify-between px-1 pt-1 relative">
+                    {/* Left Action Buttons */}
+                    <div className="flex items-center gap-2 text-[var(--sb-text-muted)] relative" ref={attachMenuRef}>
+                      {/* File / Photo Attachment Menu Button */}
+                      <button
+                        type="button"
+                        onClick={() => setIsAttachMenuOpen(!isAttachMenuOpen)}
+                        className={`orb-chip flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium cursor-pointer transition ${
+                          isAttachMenuOpen || draftAttachments.length > 0
+                            ? isDark
+                              ? "bg-white/10 text-white border border-white/20"
+                              : "bg-black/10 text-black border border-black/20"
+                            : ""
+                        }`}
+                        title="Attach Photos or Files"
+                      >
+                        <OrbIconBadge size="sm" variant="neutral">
+                          <Plus size={12} className={`transition duration-200 ${isAttachMenuOpen ? (isDark ? "rotate-45 text-white" : "rotate-45 text-black") : ""}`} />
+                        </OrbIconBadge>
+                        <span>Attach</span>
+                        {draftAttachments.length > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white text-black font-mono font-semibold">
+                            {draftAttachments.length}
+                          </span>
+                        )}
+                      </button>
+
+                      {/* Attachment Popover Action Dropdown Menu */}
+                      {isAttachMenuOpen && (
+                        <div
+                          className={`absolute bottom-full left-0 mb-2 w-60 rounded-2xl border shadow-2xl overflow-hidden p-1.5 z-50 animate-fade-in transition font-sans ${isDark
+                            ? "bg-[#1e1e1e] border-[#383838] text-[#ececec] shadow-black/60"
+                            : "bg-[#ffffff] border-[#dcdcd4] text-[#1c1c1a] shadow-xl"
+                            }`}
+                        >
+                          <div className="px-3 py-1.5 text-[10px] uppercase font-semibold tracking-wider text-[var(--sb-text-muted)] border-b border-[var(--sb-border)] mb-1">
+                            Add Attachment
+                          </div>
+
+                          {/* 1. Upload Photo / Picture */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              photoInputRef.current?.click();
+                            }}
+                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition group ${isDark ? "hover:bg-[#2a2a2a]" : "hover:bg-[#f3f3ee]"
+                              }`}
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-[var(--sb-text-primary)] shrink-0">
+                              <ImageIcon size={16} />
+                            </div>
+                            <div className="flex flex-col flex-1 min-w-0">
+                              <span className="text-xs font-semibold">Upload Photo</span>
+                              <span className="text-[10px] text-[var(--sb-text-muted)] truncate">PNG, JPG, WEBP, GIF, SVG</span>
+                            </div>
+                          </button>
+
+                          {/* 2. Upload File / Document / Code */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              fileInputRef.current?.click();
+                            }}
+                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition group ${isDark ? "hover:bg-[#2a2a2a]" : "hover:bg-[#f3f3ee]"
+                              }`}
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 shrink-0">
+                              <FileText size={16} />
+                            </div>
+                            <div className="flex flex-col flex-1 min-w-0">
+                              <span className="text-xs font-semibold">Upload File / Document</span>
+                              <span className="text-[10px] text-[var(--sb-text-muted)] truncate">PDF, CSV, JSON, TXT, Code</span>
+                            </div>
+                          </button>
+
+                          {/* 3. Capture Screen for Multimodal Analysis */}
+                          <button
+                            type="button"
+                            onClick={handleCaptureScreen}
+                            disabled={isCapturingScreen}
+                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition group ${isDark ? "hover:bg-[#2a2a2a]" : "hover:bg-[#f3f3ee]"
+                              }`}
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
+                              <Monitor size={16} />
+                            </div>
+                            <div className="flex flex-col flex-1 min-w-0">
+                              <span className="text-xs font-semibold text-cyan-400">Capture Screen</span>
+                              <span className="text-[10px] text-[var(--sb-text-muted)] truncate">
+                                {isCapturingScreen ? "Capturing..." : "Take snapshot for multimodal analysis"}
+                              </span>
+                            </div>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Agent Mode Toggle */}
+                      <button
+                        onClick={() => setIsAgentMode(!isAgentMode)}
+                        className={`orb-chip flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium cursor-pointer transition ${
+                          isAgentMode
+                            ? isDark
+                              ? "bg-white/15 text-white border border-white/30 font-semibold shadow-sm"
+                              : "bg-black/10 text-black border border-black/20 font-semibold shadow-sm"
+                            : ""
+                        }`}
+                        title="Toggle Autonomous Agent Mode"
+                      >
+                        <OrbIconBadge size="sm" variant="neutral" active={isAgentMode} glow={isAgentMode}>
+                          <AgentSparkIcon size={12} glow={isAgentMode} />
+                        </OrbIconBadge>
+                        <span>{isAgentMode ? "Agent Active" : "Agent Mode"}</span>
+                      </button>
+
+                      {/* Unified Voice Agent Button */}
+                      <button
+                        type="button"
+                        onClick={toggleVoiceAgent}
+                        className={`orb-chip flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium cursor-pointer transition ${
+                          isVoiceAgentActive
+                            ? isDark
+                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm"
+                              : "bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 shadow-sm"
+                            : ""
+                        }`}
+                        title={
+                          isVoiceAgentActive
+                            ? "Voice Agent Active: Dictating speech into chat & replying with Kokoro TTS (Click to stop)"
+                            : "Voice Agent (Dictate with Moonshine STT & converse with Kokoro TTS)"
+                        }
+                      >
+                        <OrbIconBadge size="sm" variant="emerald" active={isVoiceAgentActive} glow={isVoiceAgentActive}>
+                          {isVoiceAgentActive ? (
+                            <AudioLines size={12} className="text-emerald-400 animate-pulse" />
+                          ) : (
+                            <Mic size={12} className="text-[var(--sb-text-muted)]" />
+                          )}
+                        </OrbIconBadge>
+                        <span>
+                          {isVoiceAgentActive
+                            ? isUserSpeaking
+                              ? "Hearing..."
+                              : voiceAgentStatus === "speaking"
+                              ? "Speaking..."
+                              : "Voice ON"
+                            : "Voice Agent"}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Right Send or Stop Button */}
+                    <div className="flex items-center gap-2">
+                      {isStreaming ? (
+                        <button
+                          onClick={handleStopGeneration}
+                          className="orb-pill flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-[var(--sb-text-primary)] border border-white/20 bg-white/10 hover:bg-white/20 transition shadow cursor-pointer"
+                        >
+                          <Square size={10} className="fill-current" />
+                          <span>Stop</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleSend()}
+                          disabled={!input.trim() && draftAttachments.length === 0}
+                          className={`w-8 h-8 rounded-full orb-pill flex items-center justify-center transition-all duration-200 shadow-md ${
+                            input.trim() || draftAttachments.length > 0
+                              ? "bg-white text-black hover:bg-zinc-200 hover:scale-105 cursor-pointer shadow-lg"
+                              : "opacity-30 cursor-not-allowed text-[var(--sb-text-muted)]"
+                          }`}
+                          title={isAgentMode ? "Run Autonomous Agent" : "Send Message"}
+                        >
+                          <ArrowUp size={15} strokeWidth={2.5} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                {/* Right Send or Stop Button */}
-                <div className="flex items-center gap-2">
-                  {isStreaming ? (
-                    <button
-                      onClick={handleStopGeneration}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium transition shadow"
-                    >
-                      <Square size={12} className="fill-current" />
-                      <span>Stop</span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleSend()}
-                      disabled={!input.trim() && draftAttachments.length === 0}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center transition shadow-md ${
-                        input.trim() || draftAttachments.length > 0
-                          ? isAgentMode
-                            ? "bg-rose-600 text-white hover:bg-rose-500 cursor-pointer"
-                            : isDark
-                            ? "bg-white text-black hover:bg-[#e6e6e6] cursor-pointer"
-                            : "bg-black text-white hover:bg-[#222222] cursor-pointer"
-                          : isDark
-                          ? "bg-[#3f3f3f] text-[#777777] cursor-not-allowed"
-                          : "bg-[#e5e5de] text-[#a0a098] cursor-not-allowed"
-                      }`}
-                      title={isAgentMode ? "Run Agent Task" : "Send Message"}
-                    >
-                      <ArrowUp size={16} strokeWidth={2.5} />
-                    </button>
-                  )}
+                {/* Bottom Disclaimer */}
+                <div className="text-center text-[11px] text-[var(--sb-text-muted)] mt-2 select-none">
+                  Songbird Agent runs local commands & code with your permission. Verify outputs.
                 </div>
               </div>
-            </div>
-
-            {/* Bottom Disclaimer */}
-            <div className="text-center text-[11px] text-[var(--sb-text-muted)] mt-2 select-none">
-              Songbird Agent runs local commands & code with your permission. Verify outputs.
-            </div>
+            </footer>
           </div>
-        </footer>
-      </div>
-
-      {/* Right Split Column: Code Studio Monaco Editor */}
-      {isCodeEditorOpen && (
-        <div className="w-1/2 h-full flex flex-col min-w-[380px] overflow-hidden">
-          <CodeEditorPanel
-            theme={theme}
-            isOpen={isCodeEditorOpen}
-            onClose={() => setIsCodeEditorOpen(false)}
-            ws={socketRef.current}
-            onSendToChat={(prompt) => {
-              setInput(prompt);
-              setTimeout(() => textareaRef.current?.focus(), 100);
-            }}
-            externalOpenFile={externalOpenFile}
-            onExternalFileOpened={() => setExternalOpenFile(null)}
-          />
         </div>
-      )}
+      </div>
     </div>
-  </div>
-</div>
   );
 }

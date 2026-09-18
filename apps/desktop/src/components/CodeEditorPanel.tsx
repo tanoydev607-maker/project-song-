@@ -24,6 +24,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   Columns,
+  ExternalLink,
 } from "lucide-react";
 
 export interface FileTreeNode {
@@ -44,7 +45,8 @@ export interface EditorTab {
 interface CodeEditorPanelProps {
   theme: "dark" | "light";
   isOpen: boolean;
-  onClose: () => void;
+  onClose?: () => void;
+  onPopOut?: () => void;
   ws: WebSocket | null;
   onSendToChat?: (prompt: string) => void;
   externalOpenFile?: { path: string; content?: string; language?: string } | null;
@@ -98,6 +100,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
   theme,
   isOpen,
   onClose,
+  onPopOut,
   ws,
   onSendToChat,
   externalOpenFile,
@@ -112,7 +115,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
     {
       path: "scratch.py",
       name: "scratch.py",
-      content: `# Songbird AI Code Studio\n# Press ▶ Run (top-right) to execute code directly on your machine\n\ndef solve():\n    print("Hello from Songbird Studio!")\n    numbers = [x**2 for x in range(1, 11)]\n    print("Squares:", numbers)\n\nif __name__ == "__main__":\n    solve()\n`,
+      content: `# Songbird Beta Code Studio\n# Press ▶ Run (top-right) to execute code directly on your machine\n\ndef solve():\n    print("Hello from Songbird Studio!")\n    numbers = [x**2 for x in range(1, 11)]\n    print("Squares:", numbers)\n\nif __name__ == "__main__":\n    solve()\n`,
       language: "python",
       isDirty: false,
     },
@@ -436,12 +439,12 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
           style={{ paddingLeft: `${level * 12 + 22}px` }}
           className={`flex items-center gap-1.5 py-1 px-2 cursor-pointer text-xs rounded-md transition select-none ${
             isCurrent
-              ? "bg-rose-500/15 text-rose-500 font-medium"
+              ? "bg-white/10 text-[var(--sb-text-primary)] font-medium"
               : "text-[var(--sb-text-secondary)] hover:text-[var(--sb-text-primary)] hover:bg-[var(--sb-hover-bg)]"
           }`}
           title={node.path}
         >
-          <FileCode size={13} className={isCurrent ? "text-rose-500" : "text-[var(--sb-text-muted)]"} />
+          <FileCode size={13} className={isCurrent ? "text-[var(--sb-text-primary)]" : "text-[var(--sb-text-muted)]"} />
           <span className="truncate">{node.name}</span>
         </div>
       );
@@ -467,7 +470,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
             onClick={() => setIsFileTreeOpen(!isFileTreeOpen)}
             className={`p-1.5 rounded-lg transition ${
               isFileTreeOpen
-                ? "bg-rose-500/15 text-rose-500"
+                ? "bg-white/10 text-[var(--sb-text-primary)]"
                 : "text-[var(--sb-text-secondary)] hover:bg-[var(--sb-hover-bg)] hover:text-[var(--sb-text-primary)]"
             }`}
             title={isFileTreeOpen ? "Hide File Explorer" : "Show File Explorer"}
@@ -476,7 +479,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
           </button>
 
           <div className="flex items-center gap-1.5 font-bold tracking-tight text-sm">
-            <Code2 size={16} className="text-rose-500" />
+            <Code2 size={16} className="text-[var(--sb-text-primary)]" />
             <span>Code Studio</span>
           </div>
 
@@ -489,7 +492,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
                 </span>
               )}
               {saveStatus.status === "error" && (
-                <span className="text-rose-500 flex items-center gap-0.5">
+                <span className="text-red-400 flex items-center gap-0.5">
                   <AlertCircle size={12} /> Save failed
                 </span>
               )}
@@ -517,7 +520,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
             onClick={handleSave}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition ${
               activeTab?.isDirty
-                ? "bg-rose-500/20 border-rose-500/40 text-rose-500 hover:bg-rose-500/30"
+                ? "bg-white/15 border-white/30 text-[var(--sb-text-primary)] hover:bg-white/20"
                 : "border-[var(--sb-border)] hover:bg-[var(--sb-hover-bg)] text-[var(--sb-text-primary)]"
             }`}
             title="Save file (Ctrl+S)"
@@ -528,7 +531,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
 
           <button
             onClick={handleAskSongbird}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--sb-border)] hover:bg-rose-500/10 hover:border-rose-500/30 text-rose-500 text-xs font-medium transition"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--sb-border)] hover:bg-white/10 hover:border-white/20 text-[var(--sb-text-primary)] text-xs font-medium transition"
             title="Ask Songbird to explain, refactor, or optimize this code"
           >
             <Sparkles size={13} />
@@ -541,7 +544,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
             onClick={() => setIsConsoleOpen(!isConsoleOpen)}
             className={`p-1.5 rounded-lg border transition ${
               isConsoleOpen
-                ? "bg-rose-500/15 border-rose-500/30 text-rose-500"
+                ? "bg-white/15 border-white/20 text-[var(--sb-text-primary)]"
                 : "border-[var(--sb-border)] text-[var(--sb-text-secondary)] hover:bg-[var(--sb-hover-bg)]"
             }`}
             title={isConsoleOpen ? "Hide Terminal Console" : "Show Terminal Console"}
@@ -549,13 +552,25 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
             <Terminal size={14} />
           </button>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg border border-transparent text-[var(--sb-text-secondary)] hover:text-rose-500 hover:bg-rose-500/10 transition"
-            title="Close Code Studio (Ctrl+Shift+E)"
-          >
-            <X size={15} />
-          </button>
+          {onPopOut && (
+            <button
+              onClick={onPopOut}
+              className="p-1.5 rounded-lg border border-transparent text-[var(--sb-text-secondary)] hover:text-[var(--sb-text-primary)] hover:bg-white/5 transition"
+              title="Pop out Code Studio into new window"
+            >
+              <ExternalLink size={14} />
+            </button>
+          )}
+
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg border border-transparent text-[var(--sb-text-secondary)] hover:text-[var(--sb-text-primary)] hover:bg-white/5 transition"
+              title="Close Code Studio"
+            >
+              <X size={15} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -619,19 +634,19 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
                   className={`group flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-t-md cursor-pointer border-t-2 transition max-w-[170px] ${
                     isActive
                       ? isDark
-                        ? "bg-[#1e1e1e] border-rose-500 text-white font-medium"
-                        : "bg-[#ffffff] border-rose-500 text-[#1a1a18] font-medium"
+                        ? "bg-[#1e1e1e] border-white text-white font-medium"
+                        : "bg-[#ffffff] border-black text-[#1a1a18] font-medium"
                       : "border-transparent text-[var(--sb-text-secondary)] hover:text-[var(--sb-text-primary)] hover:bg-[var(--sb-hover-bg)]"
                   }`}
                   title={tab.path}
                 >
                   <span className="truncate">{tab.name}</span>
                   {tab.isDirty && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
                   )}
                   <button
                     onClick={(e) => closeTab(tab.path, e)}
-                    className="opacity-0 group-hover:opacity-100 hover:text-rose-500 p-0.5 rounded transition"
+                    className="opacity-0 group-hover:opacity-100 hover:text-[var(--sb-text-primary)] p-0.5 rounded transition"
                   >
                     <X size={12} />
                   </button>
@@ -690,7 +705,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
               {/* Terminal Header */}
               <div className="h-7 px-3 border-b border-[var(--sb-border)] flex items-center justify-between text-[11px] text-[var(--sb-text-secondary)] shrink-0">
                 <div className="flex items-center gap-2">
-                  <Terminal size={12} className="text-rose-500" />
+                  <Terminal size={12} className="text-[var(--sb-text-primary)]" />
                   <span className="font-semibold uppercase tracking-wider text-[10px]">
                     Output Terminal
                   </span>
@@ -699,7 +714,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
                       className={`font-mono text-[10px] px-1.5 py-0.2 rounded ${
                         lastExecutionStats.exitCode === 0
                           ? "bg-emerald-500/20 text-emerald-500"
-                          : "bg-rose-500/20 text-rose-500"
+                          : "bg-red-500/20 text-red-400"
                       }`}
                     >
                       Exit: {lastExecutionStats.exitCode} ({lastExecutionStats.durationMs}ms)
@@ -732,7 +747,7 @@ export const CodeEditorPanel: React.FC<CodeEditorPanelProps> = ({
                       key={idx}
                       className={
                         line.isError
-                          ? "text-rose-400 whitespace-pre-wrap"
+                          ? "text-red-400 whitespace-pre-wrap"
                           : isDark
                           ? "text-[#e0e0e0] whitespace-pre-wrap"
                           : "text-[#222222] whitespace-pre-wrap"

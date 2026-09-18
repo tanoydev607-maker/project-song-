@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Check, Copy, Code, Sigma, Code2 } from "lucide-react";
+import { Check, Copy, Code, Code2 } from "lucide-react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 
@@ -46,14 +46,14 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ language, code, onOpenInEditor })
     <div className="my-4 rounded-xl overflow-hidden border border-[var(--sb-code-border)] bg-[var(--sb-code-bg)] font-mono text-xs md:text-sm shadow-sm transition">
       <div className="flex items-center justify-between px-4 py-2 bg-[var(--sb-code-header)] border-b border-[var(--sb-code-border)] text-[var(--sb-text-secondary)]">
         <div className="flex items-center gap-1.5 font-sans font-medium text-xs">
-          <Code size={14} className="text-rose-500" />
+          <Code size={14} className="text-[var(--sb-text-muted)]" />
           <span>{language || "code"}</span>
         </div>
         <div className="flex items-center gap-1">
           {onOpenInEditor && (
             <button
               onClick={() => onOpenInEditor(code, language)}
-              className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-md hover:bg-[var(--sb-hover-bg)] text-[var(--sb-text-secondary)] hover:text-rose-500 transition"
+              className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-md hover:bg-[var(--sb-hover-bg)] text-[var(--sb-text-secondary)] hover:text-[var(--sb-text-primary)] transition"
               title="Open code in Code Studio"
             >
               <Code2 size={13} />
@@ -91,67 +91,29 @@ interface MathBlockProps {
 }
 
 const MathBlock: React.FC<MathBlockProps> = ({ math }) => {
-  const [copied, setCopied] = useState(false);
   const cleanMath = math.trim();
-
   let html = "";
-  let renderError = false;
   try {
     html = katex.renderToString(cleanMath, {
       displayMode: true,
       throwOnError: false,
     });
   } catch {
-    renderError = true;
+    html = "";
   }
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(cleanMath);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback
-    }
-  };
+  if (html) {
+    return (
+      <div
+        className="my-3 overflow-x-auto text-[var(--sb-text-primary)] select-text py-0.5"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    );
+  }
 
   return (
-    <div className="my-4 rounded-xl overflow-hidden border border-[var(--sb-border)] bg-[var(--sb-code-bg)] shadow-sm">
-      <div className="flex items-center justify-between px-4 py-2 bg-[var(--sb-code-header)] border-b border-[var(--sb-border)] text-[var(--sb-text-secondary)]">
-        <div className="flex items-center gap-1.5 font-sans font-medium text-xs">
-          <Sigma size={14} className="text-rose-500" />
-          <span>LaTeX Equation</span>
-        </div>
-        <button
-          onClick={handleCopy}
-          className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md hover:bg-[var(--sb-hover-bg)] text-[var(--sb-text-secondary)] hover:text-[var(--sb-text-primary)] transition"
-          title="Copy LaTeX formula"
-        >
-          {copied ? (
-            <>
-              <Check size={13} className="text-emerald-500" />
-              <span className="text-emerald-500 font-medium">Copied</span>
-            </>
-          ) : (
-            <>
-              <Copy size={13} />
-              <span>Copy LaTeX</span>
-            </>
-          )}
-        </button>
-      </div>
-      <div className="p-4 overflow-x-auto text-[var(--sb-text-primary)] select-text flex justify-center items-center min-h-[52px]">
-        {renderError || !html ? (
-          <pre className="font-mono text-xs text-rose-400 select-text">
-            <code>{cleanMath}</code>
-          </pre>
-        ) : (
-          <div
-            className="w-full text-center overflow-x-auto py-1"
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
-        )}
-      </div>
+    <div className="my-2 text-[var(--sb-text-primary)] select-text">
+      {cleanMath}
     </div>
   );
 };
@@ -165,16 +127,12 @@ const InlineMath: React.FC<{ math: string }> = ({ math }) => {
       throwOnError: false,
     });
   } catch {
-    return (
-      <code className="px-1 py-0.5 rounded-md bg-[var(--sb-code-bg)] text-rose-500 font-mono text-xs border border-[var(--sb-code-border)]">
-        ${cleanMath}$
-      </code>
-    );
+    return <span className="select-text text-[var(--sb-text-primary)]">{cleanMath}</span>;
   }
 
   return (
     <span
-      className="inline-block px-1 align-baseline text-[var(--sb-text-primary)]"
+      className="inline-block px-0.5 align-baseline text-[var(--sb-text-primary)] select-text"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
@@ -310,7 +268,7 @@ function renderBlocks(markdown: string, onOpenInEditor?: (code: string, language
     // Blockquote
     if (line.startsWith("> ")) {
       nodes.push(
-        <blockquote key={`bq-${i}`} className="border-l-3 border-rose-500 pl-4 py-1 italic bg-[var(--sb-hover-bg)] text-[var(--sb-text-secondary)] rounded-r-md my-2.5">
+        <blockquote key={`bq-${i}`} className="border-l-2 border-zinc-500 pl-4 py-1 italic bg-[var(--sb-hover-bg)] text-[var(--sb-text-secondary)] rounded-r-md my-2.5">
           {renderInline(line.slice(2))}
         </blockquote>
       );
@@ -322,7 +280,7 @@ function renderBlocks(markdown: string, onOpenInEditor?: (code: string, language
       const text = line.replace(/^\s*[-*+]\s+/, "");
       nodes.push(
         <div key={`li-${i}`} className="flex items-start gap-2.5 ml-2 my-1 text-[var(--sb-text-primary)]">
-          <span className="text-rose-500 mt-1 select-none font-bold text-sm">•</span>
+          <span className="text-[var(--sb-text-muted)] mt-1 select-none font-bold text-sm">•</span>
           <span className="flex-1">{renderInline(text)}</span>
         </div>
       );
@@ -414,7 +372,7 @@ function renderInline(text: string): React.ReactNode {
 
     if (earliestType === "code" && codeMatch) {
       parts.push(
-        <code key={keyIdx++} className="px-1.5 py-0.5 rounded-md bg-[var(--sb-code-bg)] text-rose-500 font-mono text-xs border border-[var(--sb-code-border)]">
+        <code key={keyIdx++} className="px-1.5 py-0.5 rounded-md bg-[var(--sb-code-bg)] text-[var(--sb-text-primary)] font-mono text-xs border border-[var(--sb-code-border)]">
           {codeMatch[1]}
         </code>
       );
@@ -433,7 +391,7 @@ function renderInline(text: string): React.ReactNode {
           href={linkMatch[2]}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-rose-500 hover:underline underline-offset-3"
+          className="text-[var(--sb-text-primary)] underline underline-offset-3 decoration-zinc-500 hover:decoration-white transition"
         >
           {linkMatch[1]}
         </a>

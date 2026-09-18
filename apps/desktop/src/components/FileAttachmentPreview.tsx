@@ -11,7 +11,7 @@ export const formatFileSize = (bytes: number): string => {
 export const getFileIcon = (fileName: string, type: string) => {
   const ext = fileName.split(".").pop()?.toLowerCase() || "";
   if (type.startsWith("image/") || ["png", "jpg", "jpeg", "webp", "gif", "svg"].includes(ext)) {
-    return <ImageIcon size={15} className="text-rose-500" />;
+    return <ImageIcon size={15} className="text-zinc-400" />;
   }
   if (["js", "ts", "tsx", "jsx", "py", "rs", "cpp", "c", "html", "css", "json", "yaml", "yml", "sql"].includes(ext)) {
     return <Code size={15} className="text-emerald-500" />;
@@ -89,7 +89,7 @@ export const AttachmentList: React.FC<AttachmentListProps> = ({ files, onRemove,
                         e.stopPropagation();
                         onRemove(file.id);
                       }}
-                      className="p-0.5 rounded-md hover:bg-rose-500 hover:text-white transition text-[var(--sb-text-muted)]"
+                      className="p-0.5 rounded-md hover:bg-zinc-700 hover:text-white transition text-[var(--sb-text-muted)]"
                       title="Remove attachment"
                     >
                       <X size={12} />
@@ -104,7 +104,7 @@ export const AttachmentList: React.FC<AttachmentListProps> = ({ files, onRemove,
           return (
             <div
               key={file.id}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--sb-border)] bg-[var(--sb-code-bg)] text-xs shadow-sm max-w-xs group transition hover:border-rose-500/50"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--sb-border)] bg-[var(--sb-code-bg)] text-xs shadow-sm max-w-xs group transition hover:border-white/30"
             >
               <div className="p-1.5 rounded-lg bg-[var(--sb-code-header)] flex items-center justify-center shrink-0">
                 {getFileIcon(file.name, file.type)}
@@ -120,7 +120,7 @@ export const AttachmentList: React.FC<AttachmentListProps> = ({ files, onRemove,
               {onRemove && isDraft ? (
                 <button
                   onClick={() => onRemove(file.id)}
-                  className="p-1 rounded-md text-[var(--sb-text-muted)] hover:text-rose-500 hover:bg-[var(--sb-hover-bg)] transition"
+                  className="p-1 rounded-md text-[var(--sb-text-muted)] hover:text-[var(--sb-text-primary)] hover:bg-[var(--sb-hover-bg)] transition"
                   title="Remove file"
                 >
                   <X size={13} />

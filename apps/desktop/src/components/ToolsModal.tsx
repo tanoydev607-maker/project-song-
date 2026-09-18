@@ -29,6 +29,7 @@ import {
   Shield,
   HelpCircle
 } from "lucide-react";
+import { OrbIconBadge, ToolsWrenchIcon } from "./SongbirdIcons";
 import defaultToolsCatalog from "./all_tools_catalog.json";
 
 export interface ToolParameter {
@@ -328,7 +329,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
       case "Web & Search":
         return <Globe size={14} className="text-sky-400" />;
       case "Vision & Media":
-        return <Eye size={14} className="text-rose-400" />;
+        return <Eye size={14} className="text-zinc-400" />;
       case "Memory & Planning":
         return <Brain size={14} className="text-violet-400" />;
       case "Voice & Audio":
@@ -356,7 +357,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
       case "Web & Search":
         return "bg-sky-950/60 border-sky-700/50 text-sky-300";
       case "Vision & Media":
-        return "bg-rose-950/60 border-rose-700/50 text-rose-300";
+        return "bg-zinc-800/60 border-zinc-700/50 text-zinc-300";
       case "Memory & Planning":
         return "bg-violet-950/60 border-violet-700/50 text-violet-300";
       case "Voice & Audio":
@@ -410,24 +411,22 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-md animate-fade-in">
       <div
-        className={`w-full max-w-6xl max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden transition ${
-          isDark ? "bg-[#161616] border-[#2c2c2c] text-[#e0e0e0]" : "bg-[#fbfbf9] border-[#d8d8d0] text-[#1a1a18]"
+        className={`w-full max-w-6xl max-h-[92vh] flex flex-col rounded-3xl border shadow-2xl overflow-hidden orb-modal-glass transition ${
+          isDark ? "border-white/[0.08] text-[#e0e0e0]" : "border-black/[0.08] text-[#1a1a18]"
         }`}
       >
         {/* ==================== MODAL HEADER ==================== */}
-        <div
-          className={`px-6 py-4 border-b flex items-center justify-between transition ${
-            isDark ? "bg-[#1c1c1c] border-[#2b2b2b]" : "bg-[#f4f4f0] border-[#deded6]"
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 to-indigo-600 flex items-center justify-center text-white shadow-md">
-              <Wrench size={20} />
-            </div>
+        <div className="px-6 py-4 border-b border-white/[0.08] flex items-center justify-between transition">
+          <div className="flex items-center gap-3.5">
+            <OrbIconBadge size="lg" variant="neutral" glow={true}>
+              <ToolsWrenchIcon size={22} glow={true} />
+            </OrbIconBadge>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold tracking-tight">Hermes Tools & Custom Capabilities</h2>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-500 font-mono font-semibold">
+                <h2 className="text-base font-bold tracking-tight t-shimmer" data-text="Hermes Tools & Custom Capabilities">
+                  Hermes Tools & Custom Capabilities
+                </h2>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-[var(--sb-text-secondary)] font-mono font-semibold border border-white/15">
                   v2.0
                 </span>
               </div>
@@ -440,18 +439,16 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
           <div className="flex items-center gap-2.5">
             <button
               onClick={handleOpenNewCustomTool}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-md transition"
+              className="orb-pill flex items-center gap-1.5 px-3.5 py-1.5 bg-white text-black hover:bg-zinc-200 text-xs font-semibold shadow-md transition cursor-pointer"
             >
               <Plus size={14} />
               <span>Add Custom Tool</span>
             </button>
             <button
               onClick={onClose}
-              className={`p-2 rounded-xl transition ${
-                isDark ? "text-gray-400 hover:text-white hover:bg-[#282828]" : "text-gray-500 hover:text-black hover:bg-gray-200"
-              }`}
+              className="orb-chip p-2 text-[var(--sb-text-secondary)] hover:text-[var(--sb-text-primary)] cursor-pointer"
             >
-              <X size={18} />
+              <X size={16} />
             </button>
           </div>
         </div>
@@ -465,7 +462,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5">
               <span className="text-[var(--sb-text-muted)]">Total Tools:</span>
-              <span className="font-bold text-rose-400">{totalCount}</span>
+              <span className="font-bold text-[var(--sb-text-primary)]">{totalCount}</span>
             </div>
             <div className="w-1 h-3 bg-gray-600/40 rounded-full" />
             <div className="flex items-center gap-1.5">
@@ -543,7 +540,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
               onClick={() => setFilterMode("all")}
               className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition ${
                 filterMode === "all"
-                  ? "bg-rose-600 text-white border-rose-500 shadow-sm"
+                  ? "bg-white text-black border-white shadow-sm"
                   : isDark
                   ? "bg-[#202020] border-[#303030] text-gray-400 hover:text-white"
                   : "bg-[#f2f2ee] border-[#d8d8d0] text-gray-600 hover:text-black"
@@ -595,7 +592,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
                 onClick={() => setSelectedCategory(cat)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition flex items-center gap-1.5 border ${
                   isSelected
-                    ? "bg-rose-500/20 border-rose-500/80 text-rose-400 shadow-sm font-semibold"
+                    ? "bg-white/15 border-white/30 text-white shadow-sm font-semibold"
                     : isDark
                     ? "bg-[#1c1c1c] border-[#292929] text-gray-400 hover:text-gray-200 hover:bg-[#242424]"
                     : "bg-[#f0f0ec] border-[#d8d8d0] text-gray-600 hover:text-black hover:bg-[#e4e4de]"
@@ -623,7 +620,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
               {selectedCategory === "Custom Tools" && (
                 <button
                   onClick={handleOpenNewCustomTool}
-                  className="mt-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                  className="mt-2 px-4 py-2 rounded-xl bg-white text-black hover:bg-zinc-200 text-xs font-semibold inline-flex items-center gap-1.5"
                 >
                   <Plus size={14} />
                   <span>Create Your First Custom Tool</span>
@@ -653,7 +650,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
                     {/* Tool Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center flex-wrap gap-2 mb-1.5">
-                        <span className="font-mono font-bold text-sm text-rose-400">
+                        <span className="font-mono font-bold text-sm text-[var(--sb-text-primary)]">
                           {tool.name}
                         </span>
                         <span className="text-xs text-[var(--sb-text-muted)] font-medium">
@@ -706,7 +703,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
                       {tool.requirementHint && !isOperational && (
                         <div className="mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-center gap-2">
                           <Info size={13} className="text-amber-400 flex-shrink-0" />
-                          <span>{tool.requirementHint} — To run this tool autonomously, ensure the prerequisite is installed on your host.</span>
+                          <span>{tool.requirementHint}. To run this tool autonomously, ensure the prerequisite is installed on your host.</span>
                         </div>
                       )}
                     </div>
@@ -724,7 +721,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
                           </button>
                           <button
                             onClick={() => handleDeleteCustomTool(tool.id)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-rose-500 hover:bg-gray-800 transition"
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-gray-800 transition"
                             title="Delete Custom Tool"
                           >
                             <Trash2 size={14} />
@@ -751,7 +748,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
                       <button
                         onClick={() => handleToggleTool(tool.id)}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                          tool.enabled ? "bg-rose-600" : isDark ? "bg-gray-700" : "bg-gray-300"
+                          tool.enabled ? "bg-white" : isDark ? "bg-gray-700" : "bg-gray-300"
                         }`}
                         title={tool.enabled ? "Click to Disable" : "Click to Enable"}
                       >
@@ -768,7 +765,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
                   <div className="mt-3 pt-2 border-t border-gray-800/40 flex items-center justify-between text-[11px]">
                     <button
                       onClick={() => toggleExpand(tool.id)}
-                      className="text-rose-400 hover:text-rose-300 font-medium flex items-center gap-1 transition"
+                      className="text-[var(--sb-text-primary)] hover:underline font-medium flex items-center gap-1 transition"
                     >
                       {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                       <span>{isExpanded ? "Hide Parameters & Schema" : `View Parameters (${tool.parameters.length})`}</span>
@@ -796,7 +793,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
                             <tbody className="divide-y divide-gray-800/40 text-[11px]">
                               {tool.parameters.map((p) => (
                                 <tr key={p.name} className={isDark ? "hover:bg-white/[0.02]" : "hover:bg-black/[0.02]"}>
-                                  <td className="py-1.5 pr-3 font-mono text-rose-400 font-medium">{p.name}</td>
+                                  <td className="py-1.5 pr-3 font-mono text-[var(--sb-text-primary)] font-medium">{p.name}</td>
                                   <td className="py-1.5 pr-3 font-mono text-blue-400">{p.type}</td>
                                   <td className="py-1.5 pr-3">
                                     {p.required ? (
@@ -846,13 +843,13 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
           }`}
         >
           <div className="text-[var(--sb-text-muted)] flex items-center gap-1.5">
-            <Sparkles size={13} className="text-rose-500" />
+            <Sparkles size={13} className="text-[var(--sb-text-muted)]" />
             <span>Tools enabled here are dynamically fed to Hermes Agent in autonomous Agent Mode.</span>
           </div>
 
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold transition shadow-sm text-xs"
+            className="px-4 py-1.5 rounded-xl bg-white text-black hover:bg-zinc-200 font-semibold transition shadow-sm text-xs"
           >
             Done
           </button>
@@ -869,7 +866,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
           >
             <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Sparkles size={18} className="text-rose-500" />
+                <Sparkles size={18} className="text-white" />
                 <h3 className="text-sm font-bold">
                   {editingCustomToolId ? "Edit Custom Tool" : "Create New Custom Tool"}
                 </h3>
@@ -884,7 +881,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
 
             <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
               {formError && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center gap-2">
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 flex items-center gap-2">
                   <AlertTriangle size={15} />
                   <span>{formError}</span>
                 </div>
@@ -948,7 +945,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
                       onClick={() => setCustomForm({ ...customForm, executionType: mech.id as any })}
                       className={`py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 transition ${
                         customForm.executionType === mech.id
-                          ? "bg-rose-600 text-white border-rose-500 font-semibold"
+                          ? "bg-white text-black border-white font-semibold"
                           : isDark
                           ? "bg-[#252525] border-[#3a3a3a] text-gray-400"
                           : "bg-gray-100 border-gray-300 text-gray-700"
@@ -1013,7 +1010,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-rose-400 font-bold">{p.name}</span>
+                          <span className="font-mono text-[var(--sb-text-primary)] font-bold">{p.name}</span>
                           <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-400 font-mono">
                             {p.type}
                           </span>
@@ -1027,7 +1024,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
                         <button
                           type="button"
                           onClick={() => handleRemoveParamFromForm(p.name)}
-                          className="text-gray-500 hover:text-rose-500 p-1"
+                          className="text-gray-500 hover:text-red-400 p-1"
                         >
                           <Trash2 size={13} />
                         </button>
@@ -1100,7 +1097,7 @@ export const ToolsModal: React.FC<ToolsModalProps> = ({
               <button
                 type="button"
                 onClick={handleSaveCustomTool}
-                className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs shadow-md"
+                className="px-4 py-1.5 rounded-xl bg-white text-black hover:bg-zinc-200 font-semibold text-xs shadow-md"
               >
                 Save Tool
               </button>

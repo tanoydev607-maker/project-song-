@@ -33,6 +33,16 @@ except Exception as _tool_err:
     print(f"[Hermes Engine] Notice discovering Hermes tools: {_tool_err}")
     registry = None
 
+# Hermes MCP (Model Context Protocol) Discovery & Management
+try:
+    from tools.mcp_tool import register_mcp_servers, get_mcp_status, shutdown_mcp_servers
+    print("[Hermes Engine] MCP (Model Context Protocol) Server support initialized.")
+except Exception as _mcp_err:
+    print(f"[Hermes Engine] Notice initializing MCP support: {_mcp_err}")
+    register_mcp_servers = None
+    get_mcp_status = None
+    shutdown_mcp_servers = None
+
 if sys.platform == "win32":
 
     sys.stdout.reconfigure(encoding="utf-8")
@@ -392,7 +402,7 @@ async def query_vision_api(image_data_url: str, prompt: str, api_key: str, base_
     headers = {
         "Content-Type": "application/json",
         "HTTP-Referer": "https://songbird.ai",
-        "X-Title": "Songbird AI Vision Router"
+        "X-Title": "Songbird Beta Vision Router"
     }
     if api_key and api_key.strip():
         headers["Authorization"] = f"Bearer {api_key.strip()}"
@@ -1138,7 +1148,7 @@ async def query_model_complete(messages: list[dict], model_name: str, api_key: s
     headers = {
         "Content-Type": "application/json",
         "HTTP-Referer": "https://songbird.ai",
-        "X-Title": "Songbird AI Agent"
+        "X-Title": "Songbird Beta Agent"
     }
     if api_key and api_key.strip():
         headers["Authorization"] = f"Bearer {api_key.strip()}"
@@ -1396,7 +1406,7 @@ async def stream_openai_compatible(
     headers = {
         "Content-Type": "application/json",
         "HTTP-Referer": "https://songbird.ai",
-        "X-Title": "Songbird AI"
+        "X-Title": "Songbird Beta"
     }
     if api_key and api_key.strip():
         headers["Authorization"] = f"Bearer {api_key.strip()}"
@@ -1741,6 +1751,39 @@ async def handle_client(websocket):
                     }))
                 continue
 
+            # ==================== MCP (MODEL CONTEXT PROTOCOL) ACTIONS ====================
+            if action in ["mcp_get_status", "mcp_list_servers"]:
+                servers_status = get_mcp_status() if get_mcp_status else []
+                await websocket.send(json.dumps({
+                    "type": "mcp_status_result",
+                    "servers": servers_status,
+                    "mcp_available": bool(register_mcp_servers)
+                }))
+                continue
+
+            if action in ["mcp_register_servers", "mcp_sync"]:
+                servers_payload = data.get("servers", {})
+                registered_tools = []
+                success = True
+                err_msg = None
+                if register_mcp_servers and isinstance(servers_payload, dict):
+                    try:
+                        registered_tools = register_mcp_servers(servers_payload)
+                        print(f"[Hermes Engine] Registered {len(registered_tools)} MCP tools from {len(servers_payload)} servers")
+                    except Exception as _mcp_reg_err:
+                        print(f"[Hermes Engine] MCP register error: {_mcp_reg_err}")
+                        success = False
+                        err_msg = str(_mcp_reg_err)
+                servers_status = get_mcp_status() if get_mcp_status else []
+                await websocket.send(json.dumps({
+                    "type": "mcp_register_result",
+                    "success": success,
+                    "registered_tools": registered_tools,
+                    "servers": servers_status,
+                    "error": err_msg
+                }))
+                continue
+
             # ==================== CODE EDITOR STUDIO ACTIONS ====================
             if action == "editor_list_files":
                 try:
@@ -1945,6 +1988,13 @@ async def handle_client(websocket):
             is_agent_mode = bool(data.get("agent_mode", False))
             enabled_tools = data.get("enabled_tools", None)
             custom_tools = data.get("custom_tools", [])
+            mcp_servers = data.get("mcp_servers", {})
+
+            if mcp_servers and isinstance(mcp_servers, dict) and register_mcp_servers:
+                try:
+                    register_mcp_servers(mcp_servers)
+                except Exception as _mcp_e:
+                    print(f"[Hermes Engine] Notice registering MCP servers for chat turn: {_mcp_e}")
 
             provider = (data.get("provider") or "openrouter").lower()
             api_key = data.get("api_key", "").strip()

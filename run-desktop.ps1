@@ -1,6 +1,6 @@
-# Songbird AI Desktop Launcher
+# Songbird Beta Desktop Launcher
 Write-Host "========================================================" -ForegroundColor Cyan
-Write-Host "  Launching Songbird AI Desktop Application" -ForegroundColor White
+Write-Host "  Launching Songbird Beta Desktop Application" -ForegroundColor White
 Write-Host "========================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -107,7 +107,7 @@ if (-not $browserLaunched) {
 
 Write-Host ""
 Write-Host "========================================================" -ForegroundColor Green
-Write-Host "  Songbird AI is running successfully!" -ForegroundColor White
+Write-Host "  Songbird Beta is running successfully!" -ForegroundColor White
 Write-Host "  Engine Daemon: ws://localhost:18789" -ForegroundColor Gray
 Write-Host "  Desktop UI:    http://localhost:1420" -ForegroundColor Gray
 Write-Host "========================================================" -ForegroundColor Green

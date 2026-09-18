@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { X, Sparkles, Plus, Trash2, Edit2, Check, Search, Wrench, Shield, Code, Cpu, Database, Globe, Palette, Terminal, BookOpen } from "lucide-react";
+import { OrbIconBadge, SkillsMatrixIcon } from "./SongbirdIcons";
 
 export interface AgentSkill {
   id: string;
@@ -106,7 +107,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
       case "Database":
         return <Database size={16} className="text-blue-500" />;
       case "Shield":
-        return <Shield size={16} className="text-rose-500" />;
+        return <Shield size={16} className="text-zinc-400" />;
       case "Terminal":
         return <Terminal size={16} className="text-amber-500" />;
       case "Globe":
@@ -114,7 +115,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
       case "Palette":
         return <Palette size={16} className="text-purple-500" />;
       default:
-        return <Wrench size={16} className="text-rose-500" />;
+        return <Wrench size={16} className="text-zinc-400" />;
     }
   };
 
@@ -196,34 +197,30 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
   const activeCount = skills.filter((s) => s.enabled).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm p-4 animate-fade-in font-sans">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-fade-in font-sans">
       <div
-        className={`w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border transition ${
-          isDark
-            ? "bg-[#1c1c1c] border-[#333333] text-[#ececec]"
-            : "bg-[#ffffff] border-[#e2e2dc] text-[#1c1c1a] shadow-xl"
+        className={`w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border transition orb-modal-glass ${
+          isDark ? "border-white/[0.08] text-[#ececec]" : "border-black/[0.08] text-[#1c1c1a]"
         }`}
       >
         {/* Header */}
-        <div
-          className={`flex items-center justify-between px-5 py-3.5 border-b transition ${
-            isDark ? "bg-[#171717] border-[#2b2b2b]" : "bg-[#f7f7f5] border-[#e8e8e2]"
-          }`}
-        >
-          <div className="flex items-center gap-2.5 font-semibold text-sm">
-            <Sparkles size={17} className="text-rose-500" />
-            <span>Agent Skills & Custom Capabilities</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-500 border border-rose-500/30 font-mono">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.08] transition">
+          <div className="flex items-center gap-3 font-semibold text-sm">
+            <OrbIconBadge size="md" variant="amber" glow={true}>
+              <SkillsMatrixIcon size={18} glow={true} />
+            </OrbIconBadge>
+            <span className="t-shimmer" data-text="Agent Skills & Custom Capabilities">
+              Agent Skills & Custom Capabilities
+            </span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 font-mono">
               {activeCount} Active
             </span>
           </div>
           <button
             onClick={onClose}
-            className={`p-1 rounded-lg transition ${
-              isDark ? "text-[#888888] hover:text-white hover:bg-[#282828]" : "text-[#777777] hover:text-black hover:bg-[#ecece6]"
-            }`}
+            className="orb-chip p-2 text-[var(--sb-text-secondary)] hover:text-[var(--sb-text-primary)] cursor-pointer"
           >
-            <X size={17} />
+            <X size={16} />
           </button>
         </div>
 
@@ -249,7 +246,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
 
             <button
               onClick={handleStartCreate}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-medium text-xs transition shadow-sm shrink-0"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white text-black hover:bg-zinc-200 font-medium text-xs transition shadow-sm shrink-0"
             >
               <Plus size={14} />
               <span>Create Custom Skill</span>
@@ -264,7 +261,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                 onClick={() => setActiveCategory(cat)}
                 className={`px-2.5 py-1 rounded-lg font-medium transition shrink-0 ${
                   activeCategory === cat
-                    ? "bg-rose-500/20 text-rose-500 border border-rose-500/40"
+                    ? "bg-white/10 text-white border border-white/20"
                     : isDark
                     ? "text-[#888888] hover:text-white hover:bg-[#262626]"
                     : "text-[#70706a] hover:text-black hover:bg-[#eaeae4]"
@@ -280,9 +277,9 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
         <div className="p-4 space-y-3 overflow-y-auto flex-1 text-xs">
           {isCreating ? (
             /* ==================== CREATE / EDIT SKILL FORM ==================== */
-            <form onSubmit={handleSaveForm} className="space-y-4 p-4 rounded-xl border border-rose-500/30 bg-rose-500/5">
+            <form onSubmit={handleSaveForm} className="space-y-4 p-4 rounded-xl border border-white/20 bg-white/5">
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-sm flex items-center gap-1.5 text-rose-500">
+                <span className="font-semibold text-sm flex items-center gap-1.5 text-white">
                   <Sparkles size={15} />
                   <span>{editingSkillId ? "Edit Custom Skill" : "Define New Custom Skill"}</span>
                 </span>
@@ -303,7 +300,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="e.g. Rust Microservice Architect, Rust Code Reviewer"
                   required
-                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-rose-500 ${
+                  className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-white/40 ${
                     isDark ? "bg-[#262626] border-[#383838] text-white" : "bg-white border-[#d8d8d0] text-[#1c1c1a]"
                   }`}
                 />
@@ -315,7 +312,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                   <select
                     value={formCategory}
                     onChange={(e) => setFormCategory(e.target.value as AgentSkill["category"])}
-                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-rose-500 cursor-pointer ${
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-white/40 cursor-pointer ${
                       isDark ? "bg-[#262626] border-[#383838] text-white" : "bg-white border-[#d8d8d0] text-[#1c1c1a]"
                     }`}
                   >
@@ -336,7 +333,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                     value={formDesc}
                     onChange={(e) => setFormDesc(e.target.value)}
                     placeholder="Short description of what this skill does"
-                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-rose-500 ${
+                    className={`w-full border rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-white/40 ${
                       isDark ? "bg-[#262626] border-[#383838] text-white" : "bg-white border-[#d8d8d0] text-[#1c1c1a]"
                     }`}
                   />
@@ -353,7 +350,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                   rows={4}
                   required
                   placeholder="Describe in detail how the agent should think, what rules it should follow, domain knowledge to use, or output formats to produce..."
-                  className={`w-full border rounded-xl p-3 text-xs font-mono resize-none focus:outline-none focus:border-rose-500 leading-relaxed ${
+                  className={`w-full border rounded-xl p-3 text-xs font-mono resize-none focus:outline-none focus:border-white/40 leading-relaxed ${
                     isDark ? "bg-[#262626] border-[#383838] text-white" : "bg-white border-[#d8d8d0] text-[#1c1c1a]"
                   }`}
                 />
@@ -371,7 +368,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-medium text-xs transition shadow-sm"
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-white text-black hover:bg-zinc-200 font-medium text-xs transition shadow-sm"
                 >
                   <Check size={14} />
                   <span>{editingSkillId ? "Save Changes" : "Create Skill"}</span>
@@ -387,8 +384,8 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                   className={`p-3.5 rounded-2xl border transition shadow-sm flex items-start justify-between gap-3 ${
                     skill.enabled
                       ? isDark
-                        ? "bg-[#232323] border-rose-500/50 shadow-rose-950/10"
-                        : "bg-[#ffffff] border-rose-500/60 shadow-rose-500/10 ring-1 ring-rose-500/20"
+                        ? "bg-[#232323] border-white/30"
+                        : "bg-[#ffffff] border-black/20"
                       : isDark
                       ? "bg-[#1f1f1f] border-[#2e2e2e] opacity-75 hover:opacity-100"
                       : "bg-[#fafaf8] border-[#e2e2dc] opacity-75 hover:opacity-100"
@@ -398,7 +395,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                     <div
                       className={`w-8 h-8 rounded-xl border flex items-center justify-center shrink-0 mt-0.5 ${
                         skill.enabled
-                          ? "bg-rose-500/20 border-rose-500/40 text-rose-500"
+                          ? "bg-white/10 border-white/20 text-white"
                           : isDark
                           ? "bg-[#282828] border-[#383838]"
                           : "bg-[#ecece6] border-[#d8d8d0]"
@@ -448,7 +445,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                     <button
                       onClick={() => handleToggleSkill(skill.id)}
                       className={`w-11 h-6 rounded-full p-0.5 transition-colors duration-200 ease-in-out cursor-pointer flex items-center ${
-                        skill.enabled ? "bg-rose-600 justify-end" : isDark ? "bg-[#333333] justify-start" : "bg-[#d0d0c8] justify-start"
+                        skill.enabled ? "bg-white justify-end" : isDark ? "bg-[#333333] justify-start" : "bg-[#d0d0c8] justify-start"
                       }`}
                       title={skill.enabled ? "Disable Skill" : "Enable Skill"}
                     >
@@ -466,7 +463,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
                         </button>
                         <button
                           onClick={() => handleDeleteSkill(skill.id)}
-                          className="p-1 rounded text-[var(--sb-text-muted)] hover:text-rose-500 hover:bg-[var(--sb-hover-bg)] transition"
+                          className="p-1 rounded text-[var(--sb-text-muted)] hover:text-red-400 hover:bg-[var(--sb-hover-bg)] transition"
                           title="Delete Custom Skill"
                         >
                           <Trash2 size={13} />
@@ -479,7 +476,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
 
               {filteredSkills.length === 0 && (
                 <div className="text-center py-8 space-y-2 text-[var(--sb-text-muted)]">
-                  <Sparkles size={24} className="mx-auto text-rose-500/50" />
+                  <Sparkles size={24} className="mx-auto text-zinc-500" />
                   <p>No skills found matching "{searchQuery}"</p>
                 </div>
               )}
@@ -498,7 +495,7 @@ export const SkillsModal: React.FC<SkillsModalProps> = ({
           </span>
           <button
             onClick={onClose}
-            className="flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-medium rounded-xl text-xs transition shadow-sm"
+            className="flex items-center gap-1.5 px-4 py-2 bg-white text-black hover:bg-zinc-200 font-medium rounded-xl text-xs transition shadow-sm"
           >
             <Check size={14} />
             <span>Done</span>

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Terminal, Code, FileText, Globe, CheckCircle2, XCircle, Loader2, ChevronDown, ChevronRight, Copy, Check, Monitor, Eye, Brain, Sparkles, Wrench } from "lucide-react";
+import { Terminal, Code, FileText, Globe, CheckCircle2, XCircle, ChevronDown, ChevronRight, Copy, Check, Monitor, Eye, Brain, Sparkles, Wrench } from "lucide-react";
+import { OrbIconBadge } from "./SongbirdIcons";
 
 export interface ToolExecution {
   id: string;
@@ -37,9 +38,9 @@ export const AgentToolCard: React.FC<AgentToolCardProps> = ({ execution }) => {
     }
     if (t.includes("vision") || t.includes("image") || t.includes("video") || t.includes("flux")) {
       return {
-        icon: <Eye size={15} className="text-rose-400" />,
+        icon: <Eye size={15} className="text-zinc-400" />,
         label: "Vision & Media Pipeline",
-        badgeColor: "bg-rose-950/60 border-rose-800/50 text-rose-300",
+        badgeColor: "bg-zinc-800/60 border-zinc-700/50 text-zinc-300",
       };
     }
     if (t.includes("todo") || t.includes("memory") || t.includes("session") || t.includes("clarify") || t.includes("delegate")) {
@@ -92,6 +93,7 @@ export const AgentToolCard: React.FC<AgentToolCardProps> = ({ execution }) => {
   };
 
   const meta = getToolMeta(execution.tool);
+  const isRunning = execution.status === "running";
 
   const formatInput = (inp: any): string => {
     if (typeof inp === "string") return inp;
@@ -110,47 +112,60 @@ export const AgentToolCard: React.FC<AgentToolCardProps> = ({ execution }) => {
   };
 
   return (
-    <div className="my-3 rounded-xl bg-[var(--sb-code-bg)] border border-[var(--sb-border)] overflow-hidden text-xs shadow-sm transition">
+    <div
+      className={`my-3 rounded-2xl bg-[var(--sb-code-bg)] border overflow-hidden text-xs shadow-sm transition-all duration-200 ${
+        isRunning ? "border-amber-500/40 ring-1 ring-amber-500/20" : "border-[var(--sb-border)]"
+      }`}
+    >
       {/* Header */}
       <div
         onClick={() => setIsExpanded(!isExpanded)}
         className="flex items-center justify-between px-3.5 py-2.5 bg-[var(--sb-code-header)] hover:bg-[var(--sb-hover-bg)] cursor-pointer select-none transition"
       >
-        <div className="flex items-center gap-2.5">
-          <button className="text-[var(--sb-text-muted)]">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <button className="text-[var(--sb-text-muted)] hover:text-[var(--sb-text-primary)]">
             {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </button>
-          {meta.icon}
-          <span className="font-semibold text-[var(--sb-text-primary)]">{meta.label}</span>
-          <span className="font-mono text-[10px] text-[var(--sb-text-muted)]">({execution.tool})</span>
+          {isRunning ? (
+            <OrbIconBadge size="sm" variant="amber" active={true} glow={true}>
+              <Sparkles size={11} className="text-amber-400 animate-spin" />
+            </OrbIconBadge>
+          ) : (
+            <OrbIconBadge size="sm" variant="neutral">
+              {meta.icon}
+            </OrbIconBadge>
+          )}
+          <span className="font-semibold text-[var(--sb-text-primary)] truncate">{meta.label}</span>
+          <span className="font-mono text-[10px] text-[var(--sb-text-muted)] shrink-0">({execution.tool})</span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {execution.status === "running" && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-500 text-[10px]">
-              <Loader2 size={10} className="animate-spin" />
-              <span>Running...</span>
+        <div className="flex items-center gap-2 shrink-0">
+          {isRunning && (
+            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-mono">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              <span>Executing...</span>
             </span>
           )}
           {execution.status === "success" && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-500 text-[10px]">
-              <CheckCircle2 size={10} />
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 text-[10px] font-mono">
+              <CheckCircle2 size={11} />
               <span>Completed</span>
             </span>
           )}
           {execution.status === "error" && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-500 text-[10px]">
-              <XCircle size={10} />
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 text-[10px] font-mono">
+              <XCircle size={11} />
               <span>Error</span>
             </span>
           )}
 
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               handleCopy();
             }}
-            className="text-[var(--sb-text-muted)] hover:text-[var(--sb-text-primary)] p-1 rounded hover:bg-[var(--sb-hover-bg)] transition"
+            className="text-[var(--sb-text-muted)] hover:text-[var(--sb-text-primary)] p-1 rounded hover:bg-[var(--sb-hover-bg)] transition cursor-pointer"
             title="Copy tool invocation & output"
           >
             {isCopied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}

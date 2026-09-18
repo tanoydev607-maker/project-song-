@@ -1,4 +1,4 @@
-# 🦅 Songbird AI
+# 🦅 Songbird Beta
 
 An autonomous, multi-modal desktop AI assistant and agent engine powered by **Tauri v2**, **React 19**, the **Hermes Agent Engine**, and **Kokoro-82M TTS**.
 

@@ -1,5 +1,5 @@
 @echo off
-title Songbird AI Desktop
+title Songbird Beta Desktop
 cd /d "%~dp0"
 powershell -ExecutionPolicy Bypass -NoProfile -File "%~dp0run-desktop.ps1"
 if %ERRORLEVEL% NEQ 0 (

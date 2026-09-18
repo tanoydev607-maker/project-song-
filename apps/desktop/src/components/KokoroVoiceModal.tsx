@@ -17,6 +17,7 @@ import {
   Gauge,
   Music2,
 } from "lucide-react";
+import { OrbIconBadge, VoiceWaveIcon } from "./SongbirdIcons";
 
 export interface VoicePreset {
   id: string;
@@ -94,7 +95,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
   const [verificationResult, setVerificationResult] = useState<KokoroVerificationData | null>(null);
   const [testPhrase, setTestPhrase] = useState<string>(
-    "Kokoro TTS 82M model from nazdridoy is active, verified, and operational on Songbird AI."
+    "Kokoro TTS 82M model from nazdridoy is active, verified, and operational on Songbird Beta."
   );
   const [isPlayingTestAudio, setIsPlayingTestAudio] = useState<boolean>(false);
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
@@ -292,26 +293,24 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
       <div
-        className={`w-full max-w-4xl max-h-[92vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden transition-all duration-300 ${
+        className={`w-full max-w-4xl max-h-[92vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden transition-all duration-300 orb-modal-glass ${
           isDark
-            ? "bg-[#161618] border-rose-500/30 text-white shadow-rose-950/40"
-            : "bg-[#fcfbf9] border-rose-500/20 text-[#1a1a18] shadow-rose-500/15 ring-1 ring-rose-500/10"
+            ? "border-white/[0.08] text-white shadow-2xl shadow-black/80"
+            : "border-black/[0.08] text-[#1a1a18] shadow-2xl shadow-black/10"
         }`}
       >
         {/* Header */}
-        <div
-          className={`px-6 py-5 flex items-center justify-between border-b ${
-            isDark ? "border-white/10 bg-[#1c1c1f]" : "border-black/10 bg-white"
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-rose-600 via-pink-500 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-rose-500/30">
-              <Volume2 size={20} />
-            </div>
+        <div className="px-6 py-5 flex items-center justify-between border-b border-white/[0.08]">
+          <div className="flex items-center gap-3.5">
+            <OrbIconBadge size="lg" variant="neutral" glow={false}>
+              <VoiceWaveIcon size={22} glow={false} />
+            </OrbIconBadge>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="font-bold text-lg tracking-tight">Kokoro TTS Studio</h2>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                <h2 className="font-bold text-lg tracking-tight t-shimmer" data-text="Kokoro TTS Studio">
+                  Kokoro TTS Studio
+                </h2>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white/10 text-white border border-white/20">
                   Kokoro-82M ONNX
                 </span>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
@@ -325,11 +324,9 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className={`p-2 rounded-xl transition ${
-              isDark ? "hover:bg-white/10 text-neutral-400" : "hover:bg-black/5 text-neutral-600"
-            }`}
+            className="orb-chip p-2 text-[var(--sb-text-secondary)] hover:text-white cursor-pointer"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
@@ -343,7 +340,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
             onClick={() => setActiveTab("voices")}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition ${
               activeTab === "voices"
-                ? "bg-rose-500 text-white shadow-md shadow-rose-500/30"
+                ? isDark ? "bg-white text-black shadow-sm" : "bg-black text-white shadow-sm"
                 : isDark
                 ? "text-neutral-400 hover:text-white hover:bg-white/5"
                 : "text-neutral-600 hover:text-neutral-900 hover:bg-black/5"
@@ -357,7 +354,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
             onClick={() => setActiveTab("blending")}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition ${
               activeTab === "blending"
-                ? "bg-rose-500 text-white shadow-md shadow-rose-500/30"
+                ? isDark ? "bg-white text-black shadow-sm" : "bg-black text-white shadow-sm"
                 : isDark
                 ? "text-neutral-400 hover:text-white hover:bg-white/5"
                 : "text-neutral-600 hover:text-neutral-900 hover:bg-black/5"
@@ -376,7 +373,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
             onClick={() => setActiveTab("capabilities")}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition ${
               activeTab === "capabilities"
-                ? "bg-rose-500 text-white shadow-md shadow-rose-500/30"
+                ? isDark ? "bg-white text-black shadow-sm" : "bg-black text-white shadow-sm"
                 : isDark
                 ? "text-neutral-400 hover:text-white hover:bg-white/5"
                 : "text-neutral-600 hover:text-neutral-900 hover:bg-black/5"
@@ -390,7 +387,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
             onClick={() => setActiveTab("verify")}
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl transition ${
               activeTab === "verify"
-                ? "bg-rose-500 text-white shadow-md shadow-rose-500/30"
+                ? isDark ? "bg-white text-black shadow-sm" : "bg-black text-white shadow-sm"
                 : isDark
                 ? "text-neutral-400 hover:text-white hover:bg-white/5"
                 : "text-neutral-600 hover:text-neutral-900 hover:bg-black/5"
@@ -414,10 +411,10 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <Gauge size={16} className="text-rose-500" />
+                    <Gauge size={16} className={isDark ? "text-white" : "text-black"} />
                     <span className="text-xs font-semibold">Speech Rate / Speed</span>
                   </div>
-                  <span className="text-xs font-mono font-bold text-rose-500">{speechSpeed}x</span>
+                  <span className={`text-xs font-mono font-bold ${isDark ? "text-white" : "text-black"}`}>{speechSpeed}x</span>
                 </div>
                 <input
                   type="range"
@@ -426,7 +423,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                   step="0.05"
                   value={speechSpeed}
                   onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
-                  className="w-full accent-rose-500 cursor-pointer"
+                  className={`w-full cursor-pointer ${isDark ? "accent-white" : "accent-black"}`}
                 />
                 <div className="flex justify-between text-[10px] text-neutral-400 mt-1 font-mono">
                   <span>0.5x (Slow)</span>
@@ -438,7 +435,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
 
               {/* Presets Grid */}
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-rose-500 mb-3 flex items-center gap-1.5">
+                <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 ${isDark ? "text-neutral-300" : "text-neutral-700"}`}>
                   <Sparkles size={14} /> Native Kokoro Voice Presets
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -450,7 +447,9 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                         onClick={() => handleSelectVoice(p.id)}
                         className={`p-4 rounded-2xl border cursor-pointer transition-all duration-200 ${
                           isSelected
-                            ? "border-rose-500 bg-rose-500/10 shadow-md shadow-rose-500/10 ring-1 ring-rose-500/30"
+                            ? isDark
+                              ? "border-white/40 bg-white/[0.08] shadow-md ring-1 ring-white/20"
+                              : "border-black/40 bg-black/[0.04] shadow-md ring-1 ring-black/20"
                             : isDark
                             ? "border-white/10 bg-[#1e1e22] hover:border-white/20 hover:bg-[#25252a]"
                             : "border-black/10 bg-white hover:border-black/20 hover:bg-neutral-50 shadow-sm"
@@ -461,7 +460,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                             <div
                               className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold ${
                                 isSelected
-                                  ? "bg-rose-500 text-white"
+                                  ? isDark ? "bg-white text-black" : "bg-black text-white"
                                   : isDark
                                   ? "bg-white/10 text-neutral-300"
                                   : "bg-black/5 text-neutral-700"
@@ -472,7 +471,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                             <div>
                               <div className="flex items-center gap-1.5">
                                 <span className="text-sm font-semibold">{p.name}</span>
-                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/15 text-rose-400 font-mono">
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/10 text-neutral-300 font-mono">
                                   {p.id}
                                 </span>
                               </div>
@@ -488,7 +487,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                               onClick={(e) => handlePreviewVoice(e, p.id, p.name)}
                               className={`px-2 py-1 rounded-lg border transition text-[11px] font-medium flex items-center gap-1 cursor-pointer ${
                                 previewingVoiceId === p.id && isPlayingTestAudio
-                                  ? "bg-rose-500 text-white border-rose-400 animate-pulse"
+                                  ? isDark ? "bg-white text-black border-white animate-pulse" : "bg-black text-white border-black animate-pulse"
                                   : isDark
                                   ? "bg-white/5 hover:bg-white/10 text-neutral-300 border-white/10"
                                   : "bg-black/5 hover:bg-black/10 text-neutral-700 border-black/10"
@@ -504,7 +503,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                             </button>
 
                             {isSelected ? (
-                              <span className="flex items-center gap-1 text-[11px] font-bold text-rose-500 px-2 py-0.5 rounded-full bg-rose-500/20">
+                              <span className={`flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${isDark ? "text-white bg-white/10" : "text-black bg-black/10"}`}>
                                 <Check size={12} /> Active
                               </span>
                             ) : (
@@ -527,7 +526,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
               {/* Custom Blends Section if present */}
               {blendedVoices.length > 0 && (
                 <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-rose-500 mb-3 flex items-center gap-1.5">
+                  <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5 ${isDark ? "text-neutral-300" : "text-neutral-700"}`}>
                     <Wand2 size={14} /> Custom Blended Voices ({blendedVoices.length})
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -539,7 +538,9 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                           onClick={() => handleSelectVoice(b.id)}
                           className={`p-4 rounded-2xl border cursor-pointer transition ${
                             isSelected
-                              ? "border-rose-500 bg-rose-500/10 shadow-md ring-1 ring-rose-500/30"
+                              ? isDark
+                                ? "border-white/40 bg-white/[0.08] shadow-md ring-1 ring-white/20"
+                                : "border-black/40 bg-black/[0.04] shadow-md ring-1 ring-black/20"
                               : isDark
                               ? "border-white/10 bg-[#1e1e22] hover:bg-[#25252a]"
                               : "border-black/10 bg-white hover:bg-neutral-50 shadow-sm"
@@ -553,7 +554,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                                 onClick={(e) => handlePreviewVoice(e, b.id, b.name)}
                                 className={`px-2 py-1 rounded-lg border transition text-[11px] font-medium flex items-center gap-1 cursor-pointer ${
                                   previewingVoiceId === b.id && isPlayingTestAudio
-                                    ? "bg-rose-500 text-white border-rose-400 animate-pulse"
+                                    ? isDark ? "bg-white text-black border-white animate-pulse" : "bg-black text-white border-black animate-pulse"
                                     : isDark
                                     ? "bg-white/5 hover:bg-white/10 text-neutral-300 border-white/10"
                                     : "bg-black/5 hover:bg-black/10 text-neutral-700 border-black/10"
@@ -568,7 +569,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                                 <span>Preview</span>
                               </button>
                               {isSelected && (
-                                <span className="flex items-center gap-1 text-[11px] font-bold text-rose-500 px-2 py-0.5 rounded-full bg-rose-500/20">
+                                <span className={`flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${isDark ? "text-white bg-white/10" : "text-black bg-black/10"}`}>
                                   <Check size={12} /> Active
                                 </span>
                               )}
@@ -593,7 +594,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-2.5 mb-2">
-                  <Wand2 size={18} className="text-rose-500" />
+                  <Wand2 size={18} className={isDark ? "text-white" : "text-black"} />
                   <h3 className="font-bold text-sm">Kokoro Voice Blending Studio</h3>
                 </div>
                 <p className={`text-xs mb-4 leading-relaxed ${isDark ? "text-neutral-400" : "text-neutral-600"}`}>
@@ -611,8 +612,8 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                     onChange={(e) => setBlendName(e.target.value)}
                     className={`w-full px-3.5 py-2.5 rounded-xl text-xs border outline-none transition ${
                       isDark
-                        ? "bg-[#141416] border-white/10 focus:border-rose-500 text-white"
-                        : "bg-[#f7f6f3] border-black/10 focus:border-rose-500 text-[#1a1a18]"
+                        ? "bg-[#141416] border-white/10 focus:border-white/40 text-white"
+                        : "bg-[#f7f6f3] border-black/10 focus:border-black/30 text-[#1a1a18]"
                     }`}
                   />
                 </div>
@@ -657,11 +658,11 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                 {/* Ratio Slider */}
                 <div className="space-y-2 mb-6">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-rose-400">
+                    <span className={`font-semibold ${isDark ? "text-white" : "text-black"}`}>
                       {voice1}: {Math.round(weight1 * 100)}%
                     </span>
                     <span className="font-mono text-neutral-400">Blend Ratio</span>
-                    <span className="font-semibold text-pink-400">
+                    <span className="font-semibold text-neutral-400">
                       {voice2}: {Math.round((1.0 - weight1) * 100)}%
                     </span>
                   </div>
@@ -672,7 +673,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                     step="0.05"
                     value={weight1}
                     onChange={(e) => setWeight1(parseFloat(e.target.value))}
-                    className="w-full accent-rose-500 cursor-pointer"
+                    className={`w-full cursor-pointer ${isDark ? "accent-white" : "accent-black"}`}
                   />
                 </div>
 
@@ -680,7 +681,11 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                 <button
                   onClick={handleCreateVoiceBlend}
                   disabled={isBlending}
-                  className="w-full py-3 rounded-2xl font-bold text-xs bg-gradient-to-r from-rose-600 via-pink-600 to-amber-600 text-white shadow-lg shadow-rose-500/25 hover:shadow-rose-500/40 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className={`w-full py-3 rounded-2xl font-bold text-xs transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 ${
+                    isDark
+                      ? "bg-white text-black hover:bg-neutral-200 shadow-lg shadow-white/10"
+                      : "bg-black text-white hover:bg-neutral-800 shadow-lg shadow-black/10"
+                  }`}
                 >
                   {isBlending ? (
                     <>
@@ -714,7 +719,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                 }`}
               >
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-2xl bg-rose-500/20 text-rose-500 flex items-center justify-center font-bold">
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold ${isDark ? "bg-white/10 text-white" : "bg-black/10 text-black"}`}>
                     <Cpu size={20} />
                   </div>
                   <div>
@@ -728,7 +733,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                   <div className={`p-3 rounded-2xl border ${isDark ? "bg-[#141416] border-white/10" : "bg-[#f7f6f3] border-black/10"}`}>
                     <span className="text-[10px] text-neutral-400 font-mono block">Parameters</span>
-                    <span className="text-sm font-bold text-rose-500">82 Million</span>
+                    <span className={`text-sm font-bold ${isDark ? "text-white" : "text-black"}`}>82 Million</span>
                   </div>
                   <div className={`p-3 rounded-2xl border ${isDark ? "bg-[#141416] border-white/10" : "bg-[#f7f6f3] border-black/10"}`}>
                     <span className="text-[10px] text-neutral-400 font-mono block">Sample Rate</span>
@@ -740,23 +745,23 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                   </div>
                   <div className={`p-3 rounded-2xl border ${isDark ? "bg-[#141416] border-white/10" : "bg-[#f7f6f3] border-black/10"}`}>
                     <span className="text-[10px] text-neutral-400 font-mono block">License</span>
-                    <span className="text-sm font-bold text-purple-500">Apache 2.0 / MIT</span>
+                    <span className="text-sm font-bold text-neutral-300">Apache 2.0 / MIT</span>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-rose-500">Core Subsystem Pipeline</h4>
+                  <h4 className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-neutral-300" : "text-neutral-700"}`}>Core Subsystem Pipeline</h4>
                   <div className="space-y-2 text-xs">
                     <div className="flex items-center gap-2 p-2.5 rounded-xl bg-neutral-500/10">
-                      <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-[10px]">1</span>
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ${isDark ? "bg-white/10 text-white" : "bg-black/10 text-black"}`}>1</span>
                       <span><strong>Phonemization:</strong> High-precision text-to-phoneme conversion via espeak-ng.</span>
                     </div>
                     <div className="flex items-center gap-2 p-2.5 rounded-xl bg-neutral-500/10">
-                      <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-[10px]">2</span>
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ${isDark ? "bg-white/10 text-white" : "bg-black/10 text-black"}`}>2</span>
                       <span><strong>Style Diffusion:</strong> Speaker embedding vectors condition vocal pitch, cadence, and breath.</span>
                     </div>
                     <div className="flex items-center gap-2 p-2.5 rounded-xl bg-neutral-500/10">
-                      <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-[10px]">3</span>
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ${isDark ? "bg-white/10 text-white" : "bg-black/10 text-black"}`}>3</span>
                       <span><strong>Vocoding:</strong> Generates crisp 24kHz audio waveform in real time on standard CPUs without GPU requirements.</span>
                     </div>
                   </div>
@@ -793,8 +798,8 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                     onChange={(e) => setTestPhrase(e.target.value)}
                     className={`w-full px-3.5 py-2.5 rounded-xl text-xs border outline-none ${
                       isDark
-                        ? "bg-[#141416] border-white/10 text-white focus:border-rose-500"
-                        : "bg-[#f7f6f3] border-black/10 focus:border-rose-500"
+                        ? "bg-[#141416] border-white/10 text-white focus:border-white/40"
+                        : "bg-[#f7f6f3] border-black/10 focus:border-black/30 text-[#1a1a18]"
                     }`}
                   />
                 </div>
@@ -853,7 +858,7 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
                         {isPlayingTestAudio ? (
                           <button
                             onClick={handleStopAudio}
-                            className="px-3.5 py-1.5 rounded-xl bg-rose-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                            className="px-3.5 py-1.5 rounded-xl bg-zinc-700 hover:bg-zinc-600 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
                           >
                             <Square size={13} />
                             <span>Stop Audio Proof</span>
@@ -882,23 +887,20 @@ export const KokoroVoiceModal: React.FC<KokoroVoiceModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div
-          className={`px-6 py-4 flex items-center justify-between border-t ${
-            isDark ? "border-white/10 bg-[#1c1c1f]" : "border-black/10 bg-white"
-          }`}
-        >
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-neutral-400">Active Speaker:</span>
-            <span className="font-semibold text-rose-500 font-mono">{activeVoiceId}</span>
-            <span className="text-neutral-500">•</span>
-            <span className="text-neutral-400">Speed:</span>
-            <span className="font-semibold text-neutral-300 font-mono">{speechSpeed}x</span>
+        <div className="px-6 py-4 flex items-center justify-between border-t border-white/[0.08]">
+          <div className="flex items-center gap-3 text-xs">
+            <span className="text-[var(--sb-text-secondary)]">Active speaker: <strong className={`font-semibold font-mono ${isDark ? "text-white" : "text-black"}`}>{activeVoiceId}</strong></span>
+            <span className="text-[var(--sb-text-secondary)]">Speed: <strong className="font-semibold text-[var(--sb-text-primary)] font-mono">{speechSpeed}x</strong></span>
           </div>
           <button
             onClick={onClose}
-            className="px-5 py-2 rounded-xl font-semibold text-xs bg-rose-500 hover:bg-rose-600 text-white transition shadow-md shadow-rose-500/20 cursor-pointer"
+            className={`orb-pill px-4 py-2 font-medium text-xs transition shadow-sm cursor-pointer ${
+              isDark
+                ? "bg-white text-black hover:bg-neutral-200"
+                : "bg-black text-white hover:bg-neutral-800"
+            }`}
           >
-            Done
+            Apply voice
           </button>
         </div>
       </div>

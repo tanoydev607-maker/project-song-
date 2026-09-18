@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Songbird AI",
+        "title": "Songbird Beta",
         "width": 950,
         "height": 700
       }
